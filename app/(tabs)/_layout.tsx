@@ -1,20 +1,10 @@
 import { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-
-function FigmaTabButton(props: BottomTabBarButtonProps) {
-  const selected = Boolean(props.accessibilityState?.selected);
-
-  return (
-    <HapticTab {...props} style={[styles.tabButton, props.style]}>
-      <View style={[styles.tabInner, selected && styles.tabInnerActive]}>{props.children}</View>
-    </HapticTab>
-  );
-}
 
 export default function TabLayout() {
   return (
@@ -27,7 +17,9 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.tabLabel,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
-        tabBarButton: (props) => <FigmaTabButton {...props} />,
+        tabBarButton: (props: BottomTabBarButtonProps) => <HapticTab {...props} />,
+        tabBarActiveBackgroundColor: '#AEB7A6',
+        tabBarInactiveBackgroundColor: 'transparent',
       }}>
       <Tabs.Screen
         name="index"
@@ -54,12 +46,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <MaterialIcons name="settings" size={40} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }
@@ -79,24 +65,11 @@ const styles = StyleSheet.create({
     elevation: 18,
   },
   tabItem: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabInner: {
-    width: 88,
-    minHeight: 64,
+    marginHorizontal: 10,
+    marginVertical: 6,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 6,
-  },
-  tabInnerActive: {
-    backgroundColor: '#AEB7A6',
   },
   tabLabel: {
     fontSize: 10,

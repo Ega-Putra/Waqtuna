@@ -1,98 +1,330 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+  MaterialIcons,
+  SimpleLineIcons,
+} from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const prayerItems = [
+  {
+    name: 'Subuh',
+    time: '04:21',
+    icon: <MaterialCommunityIcons name="weather-sunset-up" size={28} color="#FFFFFF" />,
+  },
+  {
+    name: 'Dzuhur',
+    time: '12:03',
+    icon: <MaterialCommunityIcons name="white-balance-sunny" size={28} color="#FFFFFF" />,
+  },
+  {
+    name: 'Ashar',
+    time: '15:27',
+    icon: <MaterialCommunityIcons name="weather-partly-cloudy" size={28} color="#FFFFFF" />,
+  },
+  {
+    name: 'Maghrib',
+    time: '18:12',
+    icon: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={28} color="#FFFFFF" />,
+  },
+  {
+    name: 'Isya',
+    time: '19:30',
+    icon: <MaterialCommunityIcons name="moon-waning-crescent" size={28} color="#FFFFFF" />,
+  },
+];
+
+function PrayerReminderCard({
+  name,
+  time,
+  icon,
+}: {
+  name: string;
+  time: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <View style={styles.prayerCard}>
+      <View style={styles.prayerInfo}>
+        <View style={styles.prayerIconWrap}>{icon}</View>
+        <View style={styles.prayerTextBlock}>
+          <Text style={styles.prayerName}>{name}</Text>
+          <Text style={styles.prayerTime}>{time}</Text>
+        </View>
+      </View>
+
+      <View style={styles.prayerActions}>
+        <SimpleLineIcons name="bell" size={23} color="#FFFFFF" />
+        <View style={styles.checkButton}>
+          <MaterialIcons name="check" size={19} color="#A2ABB3" />
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.appTitle}>Waqtuna</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <View style={styles.headerRow}>
+          <Text style={styles.greeting}>Assalamu Alaikum, Abi</Text>
+          <Text style={styles.hijriDate}>27 Syawal, 1447</Text>
+        </View>
+
+        <View style={styles.overviewRow}>
+          <View>
+            <Text style={styles.dateTitle}>Rabu, 15 Apr</Text>
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={20} color="#000000" />
+              <Text style={styles.locationText}>Surabaya, Idn</Text>
+            </View>
+          </View>
+
+          <View style={styles.streakPill}>
+            <MaterialCommunityIcons name="fire" size={15} color="#F97316" />
+            <Text style={styles.streakText}>7 Hari Beruntun</Text>
+          </View>
+        </View>
+
+        <View style={styles.heroCard}>
+          <View style={styles.heroCircle} />
+          <View style={styles.heroContent}>
+            <Text style={styles.heroTitle}>Dzuhur</Text>
+            <Text style={styles.heroTime}>11.35</Text>
+            <View style={styles.countdownRow}>
+              <MaterialCommunityIcons name="clock-outline" size={19} color="#FFFFFF" />
+              <Text style={styles.countdownText}>1j 23m hingga dzuhur</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Pengingat Ibadah</Text>
+          <View style={styles.moreWrap}>
+            <Text style={styles.moreText}>Lebih Banyak</Text>
+            <MaterialIcons name="arrow-forward" size={22} color="#007322" />
+          </View>
+        </View>
+
+        <View style={styles.listWrap}>
+          {prayerItems.map((item) => (
+            <PrayerReminderCard key={item.name} name={item.name} time={item.time} icon={item.icon} />
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#E7F0DE',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#E7F0DE',
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 28,
+  },
+  appTitle: {
+    color: '#007322',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 28,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  greeting: {
+    color: '#2F3334',
+    fontSize: 16,
+    lineHeight: 28,
+  },
+  hijriDate: {
+    color: '#5B6061',
+    fontSize: 16,
+    lineHeight: 28,
+  },
+  overviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 22,
+  },
+  dateTitle: {
+    color: '#2F3334',
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationText: {
+    color: '#000000',
+    fontSize: 16,
+    lineHeight: 28,
+  },
+  streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    shadowColor: '#000000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  streakText: {
+    color: '#C2410C',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  heroCard: {
+    height: 190,
+    borderRadius: 24,
+    backgroundColor: '#008C3A',
+    overflow: 'hidden',
+    marginBottom: 32,
+    justifyContent: 'center',
+  },
+  heroCircle: {
     position: 'absolute',
+    right: -50,
+    top: -18,
+    width: 215,
+    height: 215,
+    borderRadius: 999,
+    backgroundColor: '#58BD64',
+  },
+  heroContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    width: '68%',
+  },
+  heroTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  heroTime: {
+    color: '#FFFFFF',
+    fontSize: 52,
+    lineHeight: 56,
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  countdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  countdownText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  sectionTitle: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  moreWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  moreText: {
+    color: '#007322',
+    fontSize: 16,
+  },
+  listWrap: {
+    gap: 10,
+  },
+  prayerCard: {
+    minHeight: 80,
+    borderRadius: 24,
+    backgroundColor: '#4CB15F',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  prayerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  prayerIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: '#008C3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prayerTextBlock: {
+    justifyContent: 'center',
+    gap: 5,
+  },
+  prayerName: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: '700',
+  },
+  prayerTime: {
+    color: '#E7F4E2',
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  prayerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  checkButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

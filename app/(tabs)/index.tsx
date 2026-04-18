@@ -7,6 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { getCalendarDateParts } from '@/utils/time';
+
 const prayerItems = [
   {
     name: 'Subuh',
@@ -65,6 +67,8 @@ function PrayerReminderCard({
 }
 
 export default function HomeScreen() {
+  const { gregorianDate, hijriDate } = getCalendarDateParts();
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
@@ -75,12 +79,12 @@ export default function HomeScreen() {
 
         <View style={styles.headerRow}>
           <Text style={styles.greeting}>Assalamu Alaikum, Abi</Text>
-          <Text style={styles.hijriDate}>27 Syawal, 1447</Text>
+          <Text style={styles.hijriDate}>{hijriDate}</Text>
         </View>
 
         <View style={styles.overviewRow}>
           <View>
-            <Text style={styles.dateTitle}>Rabu, 15 Apr</Text>
+            <Text style={styles.dateTitle}>{gregorianDate}</Text>
             <View style={styles.locationRow}>
               <Ionicons name="location-outline" size={20} color="#000000" />
               <Text style={styles.locationText}>Surabaya, Idn</Text>

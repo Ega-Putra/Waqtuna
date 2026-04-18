@@ -4,38 +4,37 @@ import {
   MaterialIcons,
   SimpleLineIcons,
 } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { indonesiaCities, type IndonesiaCity } from '@/constants/indonesia-cities';
+import {
+  getInitialLocationState,
+  getLocationLabel,
+  persistSelectedCityCode,
+  searchIndonesiaCities,
+} from '@/utils/location';
+import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
 import { getCalendarDateParts } from '@/utils/time';
 
-const prayerItems = [
-  {
-    name: 'Subuh',
-    time: '04:21',
-    icon: <MaterialCommunityIcons name="weather-sunset-up" size={28} color="#FFFFFF" />,
-  },
-  {
-    name: 'Dzuhur',
-    time: '12:03',
-    icon: <MaterialCommunityIcons name="white-balance-sunny" size={28} color="#FFFFFF" />,
-  },
-  {
-    name: 'Ashar',
-    time: '15:27',
-    icon: <MaterialCommunityIcons name="weather-partly-cloudy" size={28} color="#FFFFFF" />,
-  },
-  {
-    name: 'Maghrib',
-    time: '18:12',
-    icon: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={28} color="#FFFFFF" />,
-  },
-  {
-    name: 'Isya',
-    time: '19:30',
-    icon: <MaterialCommunityIcons name="moon-waning-crescent" size={28} color="#FFFFFF" />,
-  },
-];
+const prayerIcons: Record<PrayerScheduleItem['key'], React.ReactNode> = {
+  fajr: <MaterialCommunityIcons name="weather-sunset-up" size={28} color="#FFFFFF" />,
+  dhuhr: <MaterialCommunityIcons name="white-balance-sunny" size={28} color="#FFFFFF" />,
+  asr: <MaterialCommunityIcons name="weather-partly-cloudy" size={28} color="#FFFFFF" />,
+  maghrib: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={28} color="#FFFFFF" />,
+  isha: <MaterialCommunityIcons name="moon-waning-crescent" size={28} color="#FFFFFF" />,
+};
 
 function PrayerReminderCard({
   name,
@@ -68,6 +67,73 @@ function PrayerReminderCard({
 
 export default function HomeScreen() {
   const { gregorianDate, hijriDate } = getCalendarDateParts();
+  const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(indonesiaCities[0]);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
+  const [cityQuery, setCityQuery] = useState('');
+  const [schedule, setSchedule] = useState(() =>
+    getPrayerSchedule({
+      latitude: indonesiaCities[0].latitude,
+      longitude: indonesiaCities[0].longitude,
+    })
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialLocation() {
+      const initialLocation = await getInitialLocationState();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setSelectedCity(initialLocation.city);
+      setSchedule(
+        getPrayerSchedule({
+          latitude: initialLocation.city.latitude,
+          longitude: initialLocation.city.longitude,
+        })
+      );
+      setIsBootstrapping(false);
+    }
+
+    void loadInitialLocation();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSchedule(
+        getPrayerSchedule({
+          latitude: selectedCity.latitude,
+          longitude: selectedCity.longitude,
+        })
+      );
+    }, 60_000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [selectedCity]);
+
+  const filteredCities = searchIndonesiaCities(cityQuery);
+
+  async function handleSelectCity(city: IndonesiaCity) {
+    setSelectedCity(city);
+    setSchedule(
+      getPrayerSchedule({
+        latitude: city.latitude,
+        longitude: city.longitude,
+      })
+    );
+    setIsLocationPickerVisible(false);
+    setCityQuery('');
+    await persistSelectedCityCode(city.code);
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -83,12 +149,19 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.overviewRow}>
-          <View>
+          <View style={styles.overviewMain}>
             <Text style={styles.dateTitle}>{gregorianDate}</Text>
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={20} color="#000000" />
-              <Text style={styles.locationText}>Surabaya, Idn</Text>
-            </View>
+
+            <Pressable
+              style={styles.locationRow}
+              onPress={() => setIsLocationPickerVisible(true)}
+              accessibilityRole="button">
+              <Ionicons name="location-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.locationText} numberOfLines={1}>
+                {getLocationLabel(selectedCity)}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={18} color="#FFFFFF" />
+            </Pressable>
           </View>
 
           <View style={styles.streakPill}>
@@ -100,12 +173,18 @@ export default function HomeScreen() {
         <View style={styles.heroCard}>
           <View style={styles.heroCircle} />
           <View style={styles.heroContent}>
-            <Text style={styles.heroTitle}>Dzuhur</Text>
-            <Text style={styles.heroTime}>11.35</Text>
-            <View style={styles.countdownRow}>
-              <MaterialCommunityIcons name="clock-outline" size={19} color="#FFFFFF" />
-              <Text style={styles.countdownText}>1j 23m hingga dzuhur</Text>
-            </View>
+            {isBootstrapping ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Text style={styles.heroTitle}>{schedule.nextPrayerName}</Text>
+                <Text style={styles.heroTime}>{schedule.nextPrayerHeroTime}</Text>
+                <View style={styles.countdownRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={19} color="#FFFFFF" />
+                  <Text style={styles.countdownText}>{schedule.countdownText}</Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -118,11 +197,61 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.listWrap}>
-          {prayerItems.map((item) => (
-            <PrayerReminderCard key={item.name} name={item.name} time={item.time} icon={item.icon} />
+          {schedule.prayers.map((item) => (
+            <PrayerReminderCard
+              key={item.key}
+              name={item.name}
+              time={item.time}
+              icon={prayerIcons[item.key]}
+            />
           ))}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={isLocationPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsLocationPickerVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setIsLocationPickerVisible(false)} />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Pilih Kota/Kabupaten</Text>
+          <TextInput
+            value={cityQuery}
+            onChangeText={setCityQuery}
+            placeholder="Cari kota atau kabupaten"
+            placeholderTextColor="#7C847D"
+            style={styles.searchInput}
+          />
+
+          <FlatList
+            data={filteredCities}
+            keyExtractor={(item) => item.code}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.cityList}
+            renderItem={({ item }) => {
+              const isSelected = item.code === selectedCity.code;
+
+              return (
+                <Pressable
+                  style={[styles.cityItem, isSelected && styles.cityItemSelected]}
+                  onPress={() => void handleSelectCity(item)}>
+                  <View style={styles.cityItemTextWrap}>
+                    <Text style={styles.cityItemName}>{item.city}</Text>
+                    <Text style={styles.cityItemProvince}>{item.province}</Text>
+                  </View>
+                  {isSelected ? (
+                    <MaterialIcons name="check-circle" size={22} color="#007322" />
+                  ) : (
+                    <MaterialIcons name="chevron-right" size={22} color="#6B726C" />
+                  )}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -169,6 +298,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 22,
+    gap: 12,
+  },
+  overviewMain: {
+    flex: 1,
   },
   dateTitle: {
     color: '#2F3334',
@@ -180,12 +313,20 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#008C3A',
+    borderRadius: 20,
     gap: 4,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 3,
+    maxWidth: '100%',
   },
   locationText: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 16,
-    lineHeight: 28,
+    lineHeight: 24,
+    maxWidth: 180,
   },
   streakPill: {
     flexDirection: 'row',
@@ -230,6 +371,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 20,
     width: '68%',
+    minHeight: 120,
+    justifyContent: 'center',
   },
   heroTitle: {
     color: '#FFFFFF',
@@ -330,5 +473,73 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+  },
+  modalSheet: {
+    backgroundColor: '#F4F8EF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 28,
+    maxHeight: '72%',
+  },
+  modalHandle: {
+    width: 48,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: '#C7D0BE',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  modalTitle: {
+    color: '#1D2A21',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  searchInput: {
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#E3ECD9',
+    paddingHorizontal: 14,
+    color: '#1D2A21',
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  cityList: {
+    gap: 10,
+    paddingBottom: 16,
+  },
+  cityItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cityItemSelected: {
+    borderWidth: 1,
+    borderColor: '#B9D8BD',
+    backgroundColor: '#EDF7EE',
+  },
+  cityItemTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  cityItemName: {
+    color: '#1D2A21',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  cityItemProvince: {
+    color: '#5E636A',
+    fontSize: 14,
   },
 });

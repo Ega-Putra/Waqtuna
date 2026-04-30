@@ -13,7 +13,8 @@ export default function ToolsStackLayout() {
         },
         headerShadowVisible: false,
       }}>
-      <Stack.Screen name="quran" options={{ title: 'Al-Quran' }} />
+      <Stack.Screen name="quran/index" options={{ title: 'Al-Quran' }} />
+      <Stack.Screen name="quran/[surahId]" options={{ title: 'Baca Surat' }} />
       <Stack.Screen name="qibla" options={{ title: 'Kiblat' }} />
       <Stack.Screen name="zakat" options={{ title: 'Zakat Kalkulator' }} />
       <Stack.Screen name="mosque" options={{ title: 'Masjid Terdekat' }} />

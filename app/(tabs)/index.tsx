@@ -4,7 +4,7 @@ import {
   MaterialIcons,
   SimpleLineIcons,
 } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,6 +28,14 @@ import {
 } from '@/utils/location';
 import { usePrayerNotificationSettings } from '@/src/hooks/usePrayerNotificationSettings';
 import { rescheduleAll } from '@/src/services/NotificationService';
+import {
+  getDailyChecklist,
+  getDailyProgress,
+  getStreak,
+  togglePrayer,
+  type DailyProgress,
+  type PrayerChecklist,
+} from '@/src/services/PrayerChecklistService';
 import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
 import { getCalendarDateParts } from '@/utils/time';
 
@@ -44,11 +52,15 @@ function PrayerReminderCard({
   time,
   icon,
   isHighlighted,
+  isChecked,
+  onToggle,
 }: {
   name: string;
   time: string;
   icon: React.ReactNode;
   isHighlighted?: boolean;
+  isChecked?: boolean;
+  onToggle: () => void;
 }) {
   return (
     <View style={[styles.prayerCard, isHighlighted && styles.prayerCardHighlighted]}>
@@ -62,9 +74,13 @@ function PrayerReminderCard({
 
       <View style={styles.prayerActions}>
         <SimpleLineIcons name="bell" size={23} color="#FFFFFF" />
-        <View style={styles.checkButton}>
-          <MaterialIcons name="check" size={19} color="#A2ABB3" />
-        </View>
+        <Pressable
+          style={[styles.checkButton, isChecked && styles.checkButtonChecked]}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={`Tandai sholat ${name}`}>
+          <MaterialIcons name="check" size={19} color={isChecked ? '#FFFFFF' : '#A2ABB3'} />
+        </Pressable>
       </View>
     </View>
   );
@@ -77,6 +93,9 @@ export default function HomeScreen() {
   const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [prayerChecklist, setPrayerChecklist] = useState<PrayerChecklist>({});
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress>({ checked: 0, total: 5 });
+  const [streak, setStreak] = useState(0);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
   const [schedule, setSchedule] = useState(() =>
@@ -85,6 +104,19 @@ export default function HomeScreen() {
       longitude: defaultIndonesiaCity.longitude,
     })
   );
+
+  const refreshChecklistState = useCallback(async () => {
+    const today = new Date();
+    const [checklist, progress, currentStreak] = await Promise.all([
+      getDailyChecklist(today),
+      getDailyProgress(today),
+      getStreak(today),
+    ]);
+
+    setPrayerChecklist(checklist);
+    setDailyProgress(progress);
+    setStreak(currentStreak);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -148,6 +180,35 @@ export default function HomeScreen() {
   }, [selectedCity]);
 
   useEffect(() => {
+    let isActive = true;
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+    async function loadChecklist() {
+      if (isActive) {
+        await refreshChecklistState();
+      }
+    }
+
+    function scheduleNextChecklistReset() {
+      midnightTimer = setTimeout(() => {
+        void loadChecklist();
+        scheduleNextChecklistReset();
+      }, getMillisecondsUntilNextMidnight());
+    }
+
+    void loadChecklist();
+    scheduleNextChecklistReset();
+
+    return () => {
+      isActive = false;
+
+      if (midnightTimer) {
+        clearTimeout(midnightTimer);
+      }
+    };
+  }, [refreshChecklistState]);
+
+  useEffect(() => {
     if (isBootstrapping || isNotificationSettingsLoading) {
       return;
     }
@@ -203,6 +264,19 @@ export default function HomeScreen() {
     await persistSelectedCityCode(city.code);
   }
 
+  async function handleTogglePrayer(prayerName: string) {
+    const today = new Date();
+    const nextChecklist = await togglePrayer(today, prayerName);
+    const [progress, currentStreak] = await Promise.all([getDailyProgress(today), getStreak(today)]);
+
+    setPrayerChecklist(nextChecklist);
+    setDailyProgress(progress);
+    setStreak(currentStreak);
+  }
+
+  const progressPercentage =
+    dailyProgress.total > 0 ? (dailyProgress.checked / dailyProgress.total) * 100 : 0;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
@@ -234,7 +308,7 @@ export default function HomeScreen() {
 
           <View style={styles.streakPill}>
             <MaterialCommunityIcons name="fire" size={15} color="#F97316" />
-            <Text style={styles.streakText}>7 Hari Beruntun</Text>
+            <Text style={styles.streakText}>{streak} Hari Beruntun</Text>
           </View>
         </View>
 
@@ -271,6 +345,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        <View style={styles.progressWrap}>
+          <Text style={styles.progressText}>
+            {dailyProgress.checked}/{dailyProgress.total} sholat hari ini
+          </Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+          </View>
+        </View>
+
         <View style={styles.listWrap}>
           {schedule.prayers.map((item) => (
             <PrayerReminderCard
@@ -279,6 +362,8 @@ export default function HomeScreen() {
               time={item.time}
               icon={prayerIcons[item.key]}
               isHighlighted={item.name === schedule.nextPrayerName}
+              isChecked={Boolean(prayerChecklist[item.name])}
+              onToggle={() => void handleTogglePrayer(item.name)}
             />
           ))}
         </View>
@@ -524,6 +609,28 @@ const styles = StyleSheet.create({
     color: '#007322',
     fontSize: 16,
   },
+  progressWrap: {
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  progressText: {
+    color: '#2F3334',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#C8D7BE',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#008C3A',
+  },
   listWrap: {
     gap: 10,
   },
@@ -585,6 +692,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkButtonChecked: {
+    backgroundColor: '#007322',
+    borderColor: '#E7F4E2',
   },
   modalBackdrop: {
     flex: 1,

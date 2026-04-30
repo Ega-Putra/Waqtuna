@@ -1,34 +1,66 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const zakatRate = 0.025;
-const defaultGoldPrice = 1_200_000;
-const nisabGoldGram = 85;
+import {
+  type GoldKarat,
+  type ZakatCalculationResult,
+  ZakatCalculatorService,
+} from '@/src/services/ZakatCalculatorService';
+
+type ActiveTab = 'maal' | 'income' | 'gold';
+
+const tabs: { key: ActiveTab; label: string }[] = [
+  { key: 'maal', label: 'Maal' },
+  { key: 'income', label: 'Penghasilan' },
+  { key: 'gold', label: 'Emas' },
+];
+
+const karatOptions: { value: GoldKarat; label: string }[] = [
+  { value: '24K', label: '24K' },
+  { value: '22K', label: '22K' },
+  { value: '18K', label: '18K' },
+  { value: '14K', label: '14K' },
+];
 
 export default function ZakatScreen() {
-  const [cashValue, setCashValue] = useState('');
-  const [goldValue, setGoldValue] = useState('');
-  const [incomeValue, setIncomeValue] = useState('');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('maal');
+  const [totalAssets, setTotalAssets] = useState('');
+  const [totalDebt, setTotalDebt] = useState('');
+  const [goldPrice, setGoldPrice] = useState('1500000');
+  const [monthlyIncome, setMonthlyIncome] = useState('');
+  const [ricePrice, setRicePrice] = useState('12000');
+  const [goldWeight, setGoldWeight] = useState('');
+  const [goldKarat, setGoldKarat] = useState<GoldKarat>('24K');
 
-  const result = useMemo(() => {
-    const cash = parseCurrency(cashValue);
-    const goldGram = parseCurrency(goldValue);
-    const monthlyIncome = parseCurrency(incomeValue);
-    const goldAsset = goldGram * defaultGoldPrice;
-    const maalBase = cash + goldAsset;
-    const nisabValue = nisabGoldGram * defaultGoldPrice;
-    const maalZakat = maalBase >= nisabValue ? maalBase * zakatRate : 0;
-    const incomeZakat = monthlyIncome >= nisabValue / 12 ? monthlyIncome * zakatRate : 0;
+  const maalResult = useMemo(
+    () =>
+      ZakatCalculatorService.calculateMaal({
+        totalAssets: parseNumber(totalAssets),
+        totalDebt: parseNumber(totalDebt),
+        goldPricePerGram: parseNumber(goldPrice),
+      }),
+    [goldPrice, totalAssets, totalDebt]
+  );
 
-    return {
-      maalBase,
-      nisabValue,
-      maalZakat,
-      incomeZakat,
-      total: maalZakat + incomeZakat,
-    };
-  }, [cashValue, goldValue, incomeValue]);
+  const incomeResult = useMemo(
+    () =>
+      ZakatCalculatorService.calculateIncome({
+        monthlyIncome: parseNumber(monthlyIncome),
+        ricePricePerKg: parseNumber(ricePrice),
+      }),
+    [monthlyIncome, ricePrice]
+  );
+
+  const goldResult = useMemo(
+    () =>
+      ZakatCalculatorService.calculateGold({
+        goldWeightGram: parseNumber(goldWeight),
+        karat: goldKarat,
+        goldPricePerGram: parseNumber(goldPrice),
+      }),
+    [goldKarat, goldPrice, goldWeight]
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -37,64 +69,161 @@ export default function ZakatScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>
-          Kalkulator lokal sederhana dengan nisab 85 gram emas dan zakat 2.5%.
+          Kalkulator lokal untuk estimasi zakat. Masukkan harga emas atau beras sesuai kondisi hari ini.
         </Text>
 
-        <View style={styles.formCard}>
-          <CurrencyInput
-            label="Tabungan / Aset Lancar"
-            placeholder="Contoh: 15000000"
-            value={cashValue}
-            onChangeText={setCashValue}
-            suffix="Rp"
-          />
-          <CurrencyInput
-            label="Emas yang Dimiliki"
-            placeholder="Contoh: 10"
-            value={goldValue}
-            onChangeText={setGoldValue}
-            suffix="gram"
-          />
-          <CurrencyInput
-            label="Penghasilan Bulanan"
-            placeholder="Contoh: 8000000"
-            value={incomeValue}
-            onChangeText={setIncomeValue}
-            suffix="Rp"
-          />
+        <View style={styles.tabBar}>
+          {tabs.map((tab) => (
+            <Pressable
+              key={tab.key}
+              style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
+              onPress={() => setActiveTab(tab.key)}>
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
 
-        <View style={styles.resultCard}>
-          <ResultRow label="Total aset maal" value={formatRupiah(result.maalBase)} />
-          <ResultRow label="Nisab" value={formatRupiah(result.nisabValue)} />
-          <ResultRow label="Zakat maal" value={formatRupiah(result.maalZakat)} />
-          <ResultRow label="Zakat penghasilan" value={formatRupiah(result.incomeZakat)} />
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total zakat</Text>
-            <Text style={styles.totalValue}>{formatRupiah(result.total)}</Text>
-          </View>
-        </View>
+        {activeTab === 'maal' ? (
+          <>
+            <View style={styles.formCard}>
+              <ZakatInput
+                label="Total Harta"
+                description="Tabungan, investasi, dan piutang"
+                value={totalAssets}
+                onChangeText={setTotalAssets}
+                suffix="Rp"
+                placeholder="Contoh: 100000000"
+              />
+              <ZakatInput
+                label="Total Hutang"
+                description="Hutang jatuh tempo yang mengurangi harta"
+                value={totalDebt}
+                onChangeText={setTotalDebt}
+                suffix="Rp"
+                placeholder="Contoh: 10000000"
+              />
+              <ZakatInput
+                label="Harga Emas per Gram"
+                value={goldPrice}
+                onChangeText={setGoldPrice}
+                suffix="Rp"
+                placeholder="1500000"
+              />
+            </View>
+            <ZakatResult
+              result={maalResult}
+              rows={[
+                ['Nisab', formatRupiah(maalResult.nisab)],
+                ['Harta zakatable', formatRupiah(maalResult.zakatableAmount)],
+              ]}
+            />
+          </>
+        ) : null}
+
+        {activeTab === 'income' ? (
+          <>
+            <View style={styles.formCard}>
+              <ZakatInput
+                label="Penghasilan per Bulan"
+                value={monthlyIncome}
+                onChangeText={setMonthlyIncome}
+                suffix="Rp"
+                placeholder="Contoh: 8000000"
+              />
+              <ZakatInput
+                label="Harga Beras per Kg"
+                value={ricePrice}
+                onChangeText={setRicePrice}
+                suffix="Rp"
+                placeholder="12000"
+              />
+            </View>
+            <ZakatResult
+              result={incomeResult}
+              rows={[
+                ['Nisab 520 kg beras', formatRupiah(incomeResult.nisab)],
+                ['Penghasilan zakatable', formatRupiah(incomeResult.zakatableAmount)],
+              ]}
+            />
+          </>
+        ) : null}
+
+        {activeTab === 'gold' ? (
+          <>
+            <View style={styles.formCard}>
+              <ZakatInput
+                label="Berat Emas"
+                value={goldWeight}
+                onChangeText={setGoldWeight}
+                suffix="gram"
+                placeholder="Contoh: 100"
+              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Kadar Emas</Text>
+                <View style={styles.optionGrid}>
+                  {karatOptions.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      style={[
+                        styles.optionButton,
+                        goldKarat === option.value && styles.optionButtonActive,
+                      ]}
+                      onPress={() => setGoldKarat(option.value)}>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          goldKarat === option.value && styles.optionTextActive,
+                        ]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <ZakatInput
+                label="Harga Emas 24K per Gram"
+                value={goldPrice}
+                onChangeText={setGoldPrice}
+                suffix="Rp"
+                placeholder="1500000"
+              />
+            </View>
+            <ZakatResult
+              result={goldResult}
+              rows={[
+                ['Setara emas 24K', `${formatNumber(goldResult.equivalentPureGoldGram)} gram`],
+                ['Nisab emas 24K', `${formatNumber(goldResult.nisab)} gram`],
+                ['Nilai emas zakatable', formatRupiah(goldResult.zakatableAmount)],
+              ]}
+            />
+          </>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function CurrencyInput({
+function ZakatInput({
   label,
-  placeholder,
+  description,
   value,
   onChangeText,
   suffix,
+  placeholder,
 }: {
   label: string;
-  placeholder: string;
+  description?: string;
   value: string;
   onChangeText: (value: string) => void;
   suffix: string;
+  placeholder: string;
 }) {
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
+      {description ? <Text style={styles.inputDescription}>{description}</Text> : null}
       <View style={styles.inputWrap}>
         <TextInput
           value={value}
@@ -110,6 +239,37 @@ function CurrencyInput({
   );
 }
 
+function ZakatResult({
+  result,
+  rows,
+}: {
+  result: ZakatCalculationResult;
+  rows: [string, string][];
+}) {
+  return (
+    <View style={styles.resultCard}>
+      <View
+        style={[
+          styles.statusBadge,
+          result.isObligatory ? styles.statusBadgeRequired : styles.statusBadgeNotRequired,
+        ]}>
+        <Text style={styles.statusText}>
+          {result.isObligatory ? 'Wajib zakat' : 'Belum wajib zakat'}
+        </Text>
+      </View>
+
+      {rows.map(([label, value]) => (
+        <ResultRow key={label} label={label} value={value} />
+      ))}
+
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Jumlah zakat</Text>
+        <Text style={styles.totalValue}>{formatRupiah(result.zakat)}</Text>
+      </View>
+    </View>
+  );
+}
+
 function ResultRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.resultRow}>
@@ -119,7 +279,7 @@ function ResultRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function parseCurrency(value: string) {
+function parseNumber(value: string) {
   const numericValue = Number(value.replace(/[^\d]/g, ''));
 
   return Number.isFinite(numericValue) ? numericValue : 0;
@@ -130,6 +290,12 @@ function formatRupiah(value: number) {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('id-ID', {
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -152,6 +318,31 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 14,
   },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#D7E6CB',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 14,
+  },
+  tabButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  tabButtonActive: {
+    backgroundColor: '#007322',
+  },
+  tabText: {
+    color: '#4D5A4F',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
   formCard: {
     backgroundColor: '#F5FAEF',
     borderRadius: 18,
@@ -167,6 +358,12 @@ const styles = StyleSheet.create({
     color: '#1D2A21',
     fontSize: 14,
     fontWeight: '800',
+  },
+  inputDescription: {
+    color: '#66706A',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -4,
   },
   inputWrap: {
     minHeight: 48,
@@ -188,12 +385,57 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginLeft: 8,
   },
+  optionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionButton: {
+    minHeight: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C8D7BE',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  optionButtonActive: {
+    backgroundColor: '#007322',
+    borderColor: '#007322',
+  },
+  optionText: {
+    color: '#2F3334',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  optionTextActive: {
+    color: '#FFFFFF',
+  },
   resultCard: {
     backgroundColor: '#00813A',
     borderRadius: 18,
     padding: 14,
     gap: 10,
     marginTop: 16,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 2,
+  },
+  statusBadgeRequired: {
+    backgroundColor: '#F6D365',
+  },
+  statusBadgeNotRequired: {
+    backgroundColor: '#DFF2E1',
+  },
+  statusText: {
+    color: '#1D2A21',
+    fontSize: 13,
+    fontWeight: '900',
   },
   resultRow: {
     flexDirection: 'row',
@@ -203,11 +445,14 @@ const styles = StyleSheet.create({
   resultLabel: {
     color: '#DFF2E1',
     fontSize: 14,
+    flex: 1,
   },
   resultValue: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+    textAlign: 'right',
+    flex: 1,
   },
   totalRow: {
     borderTopWidth: 1,

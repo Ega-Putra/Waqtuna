@@ -1,9 +1,11 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import type { IslamicCalendarEvent } from '@/src/services/IslamicCalendarService';
 import type { PrayerScheduleItem } from '@/utils/prayer';
 
 const PRAYER_NOTIFICATION_CHANNEL_ID = 'waqtuna-prayer-times';
+const ISLAMIC_EVENT_NOTIFICATION_CHANNEL_ID = 'waqtuna-islamic-events';
 
 export type PrayerNotificationKey = 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya';
 
@@ -116,6 +118,81 @@ export async function rescheduleAll(
   }
 
   return schedulePrayerNotifications(prayerTimes, settings);
+}
+
+export async function scheduleIslamicEventNotifications(
+  events: IslamicCalendarEvent[]
+): Promise<string[]> {
+  const hasPermission = await requestPermission();
+
+  if (!hasPermission) {
+    return [];
+  }
+
+  await ensureIslamicEventChannel();
+  await cancelIslamicEventNotifications();
+
+  const now = new Date();
+  const scheduledNotificationIds: string[] = [];
+
+  for (const event of events) {
+    const triggerDate = new Date(event.gregorianDate);
+
+    triggerDate.setDate(triggerDate.getDate() - 1);
+    triggerDate.setHours(8, 0, 0, 0);
+
+    if (triggerDate <= now) {
+      continue;
+    }
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Besok ${event.title}`,
+        body: 'Jangan lupa persiapkan amalan terbaik.',
+        sound: 'default',
+        data: {
+          category: 'islamic-event',
+          eventId: event.id,
+          eventTitle: event.title,
+        },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        channelId: ISLAMIC_EVENT_NOTIFICATION_CHANNEL_ID,
+      },
+    });
+
+    scheduledNotificationIds.push(notificationId);
+  }
+
+  return scheduledNotificationIds;
+}
+
+async function cancelIslamicEventNotifications() {
+  const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+  const eventNotifications = scheduledNotifications.filter(
+    (notification) => notification.content.data?.category === 'islamic-event'
+  );
+
+  await Promise.all(
+    eventNotifications.map((notification) =>
+      Notifications.cancelScheduledNotificationAsync(notification.identifier)
+    )
+  );
+}
+
+async function ensureIslamicEventChannel() {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  await Notifications.setNotificationChannelAsync(ISLAMIC_EVENT_NOTIFICATION_CHANNEL_ID, {
+    name: 'Hari Besar Islam',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
+  });
 }
 
 function toNotificationKey(prayerKey: PrayerScheduleItem['key']): PrayerNotificationKey {

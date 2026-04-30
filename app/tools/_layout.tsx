@@ -19,6 +19,7 @@ export default function ToolsStackLayout() {
       <Stack.Screen name="qibla" options={{ title: 'Kiblat' }} />
       <Stack.Screen name="zakat" options={{ title: 'Zakat Kalkulator' }} />
       <Stack.Screen name="mosque" options={{ title: 'Masjid Terdekat' }} />
+      <Stack.Screen name="calendar" options={{ title: 'Kalender Islam' }} />
       <Stack.Screen name="ai" options={{ title: 'Tanya AI' }} />
     </Stack>
   );

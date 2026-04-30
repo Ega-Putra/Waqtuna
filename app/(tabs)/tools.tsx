@@ -36,6 +36,12 @@ const toolCards = [
     route: '/tools/zakat',
     icon: <FontAwesome6 name="hand-holding-dollar" size={46} color="#FFFFFF" />,
   },
+  {
+    key: 'calendar',
+    title: 'Kalender\nIslam',
+    route: '/tools/calendar',
+    icon: <MaterialCommunityIcons name="calendar-star-outline" size={52} color="#FFFFFF" />,
+  },
 ] as const;
 
 function ToolCard({

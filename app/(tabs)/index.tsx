@@ -26,6 +26,8 @@ import {
   persistSelectedCityCode,
   searchIndonesiaCities,
 } from '@/utils/location';
+import { usePrayerNotificationSettings } from '@/src/hooks/usePrayerNotificationSettings';
+import { rescheduleAll } from '@/src/services/NotificationService';
 import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
 import { getCalendarDateParts } from '@/utils/time';
 
@@ -70,6 +72,8 @@ function PrayerReminderCard({
 
 export default function HomeScreen() {
   const { gregorianDate, hijriDate } = getCalendarDateParts();
+  const { settings: notificationSettings, isLoading: isNotificationSettingsLoading } =
+    usePrayerNotificationSettings();
   const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -142,6 +146,46 @@ export default function HomeScreen() {
       clearInterval(interval);
     };
   }, [selectedCity]);
+
+  useEffect(() => {
+    if (isBootstrapping || isNotificationSettingsLoading) {
+      return;
+    }
+
+    let isActive = true;
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+    async function scheduleNotifications() {
+      const currentSchedule = getPrayerSchedule({
+        latitude: selectedCity.latitude,
+        longitude: selectedCity.longitude,
+      });
+
+      await rescheduleAll(currentSchedule.prayers, notificationSettings);
+    }
+
+    function scheduleNextMidnightRefresh() {
+      midnightTimer = setTimeout(() => {
+        if (!isActive) {
+          return;
+        }
+
+        void scheduleNotifications();
+        scheduleNextMidnightRefresh();
+      }, getMillisecondsUntilNextMidnight());
+    }
+
+    void scheduleNotifications();
+    scheduleNextMidnightRefresh();
+
+    return () => {
+      isActive = false;
+
+      if (midnightTimer) {
+        clearTimeout(midnightTimer);
+      }
+    };
+  }, [isBootstrapping, isNotificationSettingsLoading, notificationSettings, selectedCity]);
 
   const filteredCities = searchIndonesiaCities(cityQuery);
 
@@ -286,6 +330,16 @@ export default function HomeScreen() {
       </Modal>
     </SafeAreaView>
   );
+}
+
+function getMillisecondsUntilNextMidnight() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+
+  nextMidnight.setDate(now.getDate() + 1);
+  nextMidnight.setHours(0, 0, 5, 0);
+
+  return nextMidnight.getTime() - now.getTime();
 }
 
 const styles = StyleSheet.create({

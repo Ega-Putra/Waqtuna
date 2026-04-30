@@ -18,8 +18,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { indonesiaCities, type IndonesiaCity } from '@/constants/indonesia-cities';
+import { type IndonesiaCity } from '@/constants/indonesia-cities';
 import {
+  defaultIndonesiaCity,
   getInitialLocationState,
   getLocationLabel,
   persistSelectedCityCode,
@@ -40,13 +41,15 @@ function PrayerReminderCard({
   name,
   time,
   icon,
+  isHighlighted,
 }: {
   name: string;
   time: string;
   icon: React.ReactNode;
+  isHighlighted?: boolean;
 }) {
   return (
-    <View style={styles.prayerCard}>
+    <View style={[styles.prayerCard, isHighlighted && styles.prayerCardHighlighted]}>
       <View style={styles.prayerInfo}>
         <View style={styles.prayerIconWrap}>{icon}</View>
         <View style={styles.prayerTextBlock}>
@@ -67,14 +70,15 @@ function PrayerReminderCard({
 
 export default function HomeScreen() {
   const { gregorianDate, hijriDate } = getCalendarDateParts();
-  const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(indonesiaCities[0]);
+  const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
   const [schedule, setSchedule] = useState(() =>
     getPrayerSchedule({
-      latitude: indonesiaCities[0].latitude,
-      longitude: indonesiaCities[0].longitude,
+      latitude: defaultIndonesiaCity.latitude,
+      longitude: defaultIndonesiaCity.longitude,
     })
   );
 
@@ -82,20 +86,39 @@ export default function HomeScreen() {
     let isMounted = true;
 
     async function loadInitialLocation() {
-      const initialLocation = await getInitialLocationState();
+      try {
+        const initialLocation = await getInitialLocationState();
 
-      if (!isMounted) {
-        return;
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedCity(initialLocation.city);
+        setSchedule(
+          getPrayerSchedule({
+            latitude: initialLocation.city.latitude,
+            longitude: initialLocation.city.longitude,
+          })
+        );
+        setLocationError(null);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setSelectedCity(defaultIndonesiaCity);
+        setSchedule(
+          getPrayerSchedule({
+            latitude: defaultIndonesiaCity.latitude,
+            longitude: defaultIndonesiaCity.longitude,
+          })
+        );
+        setLocationError('Lokasi tidak bisa dimuat. Jadwal memakai kota default Surabaya.');
+      } finally {
+        if (isMounted) {
+          setIsBootstrapping(false);
+        }
       }
-
-      setSelectedCity(initialLocation.city);
-      setSchedule(
-        getPrayerSchedule({
-          latitude: initialLocation.city.latitude,
-          longitude: initialLocation.city.longitude,
-        })
-      );
-      setIsBootstrapping(false);
     }
 
     void loadInitialLocation();
@@ -113,7 +136,7 @@ export default function HomeScreen() {
           longitude: selectedCity.longitude,
         })
       );
-    }, 60_000);
+    }, 1_000);
 
     return () => {
       clearInterval(interval);
@@ -132,6 +155,7 @@ export default function HomeScreen() {
     );
     setIsLocationPickerVisible(false);
     setCityQuery('');
+    setLocationError(null);
     await persistSelectedCityCode(city.code);
   }
 
@@ -170,6 +194,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {locationError ? (
+          <View style={styles.locationErrorBox}>
+            <MaterialIcons name="info-outline" size={18} color="#7A4E00" />
+            <Text style={styles.locationErrorText}>{locationError}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.heroCard}>
           <View style={styles.heroCircle} />
           <View style={styles.heroContent}>
@@ -203,6 +234,7 @@ export default function HomeScreen() {
               name={item.name}
               time={item.time}
               icon={prayerIcons[item.key]}
+              isHighlighted={item.name === schedule.nextPrayerName}
             />
           ))}
         </View>
@@ -328,6 +360,26 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 180,
   },
+  locationErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF7D6',
+    borderWidth: 1,
+    borderColor: '#F2D17A',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: -8,
+    marginBottom: 18,
+  },
+  locationErrorText: {
+    flex: 1,
+    color: '#7A4E00',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
   streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -425,11 +477,17 @@ const styles = StyleSheet.create({
     minHeight: 80,
     borderRadius: 24,
     backgroundColor: '#4CB15F',
+    borderWidth: 2,
+    borderColor: 'transparent',
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  prayerCardHighlighted: {
+    backgroundColor: '#008C3A',
+    borderColor: '#F6D365',
   },
   prayerInfo: {
     flexDirection: 'row',

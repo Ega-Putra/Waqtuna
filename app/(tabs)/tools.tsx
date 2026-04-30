@@ -1,7 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import {
-  Feather,
   FontAwesome6,
   MaterialCommunityIcons,
   MaterialIcons,
@@ -11,12 +10,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const mapImage =
   'https://www.figma.com/api/mcp/asset/815ef910-5505-484b-94fc-60804c0f6858';
-
-const nearbyMosques = [
-  'Masjid Al-Falah (15m)',
-  'Masjid Al-Ikhlas (20m)',
-  'Masjid An-Nur (25m)',
-];
 
 const toolCards = [
   {
@@ -44,15 +37,6 @@ const toolCards = [
     icon: <FontAwesome6 name="hand-holding-dollar" size={46} color="#FFFFFF" />,
   },
 ] as const;
-
-function MosqueRow({ name }: { name: string }) {
-  return (
-    <Pressable style={styles.mosqueRow} onPress={() => router.push('/tools/mosque')}>
-      <Text style={styles.mosqueRowText}>{name}</Text>
-      <Feather name="send" size={24} color="#FFFFFF" />
-    </Pressable>
-  );
-}
 
 function ToolCard({
   title,
@@ -88,12 +72,6 @@ export default function ToolsScreen() {
             <View style={styles.locateButton}>
               <MaterialIcons name="my-location" size={24} color="#FFFFFF" />
             </View>
-          </View>
-
-          <View style={styles.mosqueList}>
-            {nearbyMosques.map((mosque) => (
-              <MosqueRow key={mosque} name={mosque} />
-            ))}
           </View>
         </Pressable>
 
@@ -164,25 +142,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#00813A',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  mosqueList: {
-    gap: 10,
-  },
-  mosqueRow: {
-    backgroundColor: '#47AC5E',
-    borderRadius: 24,
-    paddingHorizontal: 10,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  mosqueRowText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-    flexShrink: 1,
-    paddingRight: 12,
   },
   toolsGrid: {
     flexDirection: 'row',

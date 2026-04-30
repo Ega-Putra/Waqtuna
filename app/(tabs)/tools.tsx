@@ -22,32 +22,32 @@ const toolCards = [
   {
     key: 'quran',
     title: 'Al-Quran',
-    route: './quran',
+    route: '/tools/quran',
     icon: <MaterialCommunityIcons name="book-open-page-variant-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'ai',
     title: 'Tanya\nAI',
-    route: './ai',
+    route: '/tools/ai',
     icon: <MaterialCommunityIcons name="robot-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'kiblat',
     title: 'Kiblat',
-    route: './qibla',
+    route: '/tools/qibla',
     icon: <MaterialCommunityIcons name="compass-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'zakat',
     title: 'Zakat\nKalkulator',
-    route: './zakat',
+    route: '/tools/zakat',
     icon: <FontAwesome6 name="hand-holding-dollar" size={46} color="#FFFFFF" />,
   },
 ] as const;
 
 function MosqueRow({ name }: { name: string }) {
   return (
-    <Pressable style={styles.mosqueRow} onPress={() => router.push('./mosque')}>
+    <Pressable style={styles.mosqueRow} onPress={() => router.push('/tools/mosque')}>
       <Text style={styles.mosqueRowText}>{name}</Text>
       <Feather name="send" size={24} color="#FFFFFF" />
     </Pressable>
@@ -80,7 +80,7 @@ export default function ToolsScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.appTitle}>Waqtuna</Text>
 
-        <Pressable style={styles.nearbyCard} onPress={() => router.push('./mosque')}>
+        <Pressable style={styles.nearbyCard} onPress={() => router.push('/tools/mosque')}>
           <Text style={styles.nearbyTitle}>Masjid Terdekat</Text>
 
           <View style={styles.mapWrap}>

@@ -36,6 +36,10 @@ import {
   type DailyProgress,
   type PrayerChecklist,
 } from '@/src/services/PrayerChecklistService';
+import {
+  updateAllHomeWidgets,
+  updateChecklistWidget,
+} from '@/src/services/WidgetUpdateService';
 import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
 import { getCalendarDateParts } from '@/utils/time';
 
@@ -262,6 +266,7 @@ export default function HomeScreen() {
     setCityQuery('');
     setLocationError(null);
     await persistSelectedCityCode(city.code);
+    await updateAllHomeWidgets();
   }
 
   async function handleTogglePrayer(prayerName: string) {
@@ -272,6 +277,7 @@ export default function HomeScreen() {
     setPrayerChecklist(nextChecklist);
     setDailyProgress(progress);
     setStreak(currentStreak);
+    await updateChecklistWidget();
   }
 
   const progressPercentage =

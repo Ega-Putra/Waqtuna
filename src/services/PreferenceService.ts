@@ -12,6 +12,7 @@ export const PreferenceStorageKeys = {
   notificationSettings: 'waqtuna.prayer-notification-settings',
   fastingReminderSettings: 'waqtuna.fasting-reminder-settings',
   selectedCityCode: 'waqtuna.selected-city-code',
+  onboardingCompleted: 'onboarding:completed',
 } as const;
 
 export type ClockFormat = '12h' | '24h';
@@ -140,6 +141,16 @@ export async function getLocationRequested(): Promise<string | null> {
 
 export async function setLocationRequested(value: boolean): Promise<void> {
   await AsyncStorage.setItem(PreferenceStorageKeys.locationRequested, String(value));
+}
+
+export async function getOnboardingCompleted(): Promise<boolean> {
+  const rawValue = await AsyncStorage.getItem(PreferenceStorageKeys.onboardingCompleted);
+
+  return rawValue === 'true';
+}
+
+export async function setOnboardingCompleted(value: boolean): Promise<void> {
+  await AsyncStorage.setItem(PreferenceStorageKeys.onboardingCompleted, String(value));
 }
 
 function parseAppPreferences(rawValue: string | null): AppPreferences {

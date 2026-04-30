@@ -8,6 +8,7 @@ const PRAYER_NOTIFICATION_CHANNEL_ID = 'waqtuna-prayer-times';
 export type PrayerNotificationKey = 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya';
 
 export type PrayerNotificationSettings = {
+  isEnabled: boolean;
   enabledPrayers: Record<PrayerNotificationKey, boolean>;
   reminderMinutes: number;
 };
@@ -48,6 +49,10 @@ export async function schedulePrayerNotifications(
   prayerTimes: PrayerNotificationTime[],
   settings: PrayerNotificationSettings
 ): Promise<string[]> {
+  if (!settings.isEnabled) {
+    return [];
+  }
+
   const hasPermission = await requestPermission();
 
   if (!hasPermission) {

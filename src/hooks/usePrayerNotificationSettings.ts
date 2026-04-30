@@ -1,23 +1,14 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
   PrayerNotificationKey,
   PrayerNotificationSettings,
 } from '@/src/services/NotificationService';
-
-const PRAYER_NOTIFICATION_SETTINGS_KEY = 'waqtuna.prayer-notification-settings';
-
-export const defaultPrayerNotificationSettings: PrayerNotificationSettings = {
-  enabledPrayers: {
-    subuh: true,
-    dzuhur: true,
-    ashar: true,
-    maghrib: true,
-    isya: true,
-  },
-  reminderMinutes: 0,
-};
+import {
+  defaultPrayerNotificationSettings,
+  getPrayerNotificationSettings,
+  setPrayerNotificationSettings,
+} from '@/src/services/PreferenceService';
 
 export function usePrayerNotificationSettings() {
   const [settings, setSettings] = useState<PrayerNotificationSettings>(
@@ -30,11 +21,10 @@ export function usePrayerNotificationSettings() {
 
     async function loadSettings() {
       try {
-        const storedValue = await AsyncStorage.getItem(PRAYER_NOTIFICATION_SETTINGS_KEY);
-        const parsedSettings = parseSettings(storedValue);
+        const storedSettings = await getPrayerNotificationSettings();
 
         if (isMounted) {
-          setSettings(parsedSettings);
+          setSettings(storedSettings);
         }
       } finally {
         if (isMounted) {
@@ -52,7 +42,7 @@ export function usePrayerNotificationSettings() {
 
   const persistSettings = useCallback(async (nextSettings: PrayerNotificationSettings) => {
     setSettings(nextSettings);
-    await AsyncStorage.setItem(PRAYER_NOTIFICATION_SETTINGS_KEY, JSON.stringify(nextSettings));
+    await setPrayerNotificationSettings(nextSettings);
   }, []);
 
   const setPrayerEnabled = useCallback(
@@ -89,42 +79,12 @@ export function usePrayerNotificationSettings() {
   );
 }
 
-function parseSettings(rawValue: string | null): PrayerNotificationSettings {
-  if (!rawValue) {
-    return defaultPrayerNotificationSettings;
-  }
-
-  try {
-    const parsed = JSON.parse(rawValue) as Partial<PrayerNotificationSettings>;
-
-    return {
-      enabledPrayers: {
-        ...defaultPrayerNotificationSettings.enabledPrayers,
-        ...parseEnabledPrayers(parsed.enabledPrayers),
-      },
-      reminderMinutes: sanitizeReminderMinutes(parsed.reminderMinutes),
-    };
-  } catch {
-    return defaultPrayerNotificationSettings;
-  }
-}
-
-function parseEnabledPrayers(
-  value: Partial<Record<PrayerNotificationKey, boolean>> | undefined
-) {
-  if (!value) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).filter(([, isEnabled]) => typeof isEnabled === 'boolean')
-  ) as Partial<Record<PrayerNotificationKey, boolean>>;
-}
-
 function sanitizeReminderMinutes(value: unknown) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
+  const allowedValues = [5, 10, 15, 30];
+
+  if (typeof value !== 'number' || !allowedValues.includes(value)) {
     return defaultPrayerNotificationSettings.reminderMinutes;
   }
 
-  return Math.max(0, Math.floor(value));
+  return value;
 }

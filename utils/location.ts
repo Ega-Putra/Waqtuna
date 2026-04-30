@@ -1,11 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 
 import { indonesiaCities, type IndonesiaCity } from '@/constants/indonesia-cities';
+import {
+  getInitialCoordinates,
+  getLocationRequested,
+  getSelectedCityCode,
+  setInitialCoordinates,
+  setLocationRequested,
+  setSelectedCityCode,
+} from '@/src/services/PreferenceService';
 
-const INITIAL_COORDINATES_KEY = 'waqtuna.initial-coordinates';
-const LOCATION_REQUESTED_KEY = 'waqtuna.location-requested';
-const SELECTED_CITY_CODE_KEY = 'waqtuna.selected-city-code';
 const DEFAULT_CITY_CODE = '35.78';
 
 export type StoredCoordinates = {
@@ -23,15 +27,15 @@ export const defaultIndonesiaCity =
 
 export async function getInitialLocationState(): Promise<InitialLocationState> {
   const [storedCoordinatesRaw, selectedCityCode, locationRequested] = await Promise.all([
-    AsyncStorage.getItem(INITIAL_COORDINATES_KEY),
-    AsyncStorage.getItem(SELECTED_CITY_CODE_KEY),
-    AsyncStorage.getItem(LOCATION_REQUESTED_KEY),
+    getInitialCoordinates(),
+    getSelectedCityCode(),
+    getLocationRequested(),
   ]);
 
   let coordinates = parseStoredCoordinates(storedCoordinatesRaw);
 
   if (!coordinates && locationRequested !== 'true') {
-    await AsyncStorage.setItem(LOCATION_REQUESTED_KEY, 'true');
+    await setLocationRequested(true);
 
     const permission = await Location.requestForegroundPermissionsAsync();
 
@@ -45,7 +49,7 @@ export async function getInitialLocationState(): Promise<InitialLocationState> {
         longitude: position.coords.longitude,
       };
 
-      await AsyncStorage.setItem(INITIAL_COORDINATES_KEY, JSON.stringify(coordinates));
+      await setInitialCoordinates(JSON.stringify(coordinates));
     }
   }
 
@@ -63,7 +67,7 @@ export function findCityByCode(code: string) {
 }
 
 export async function persistSelectedCityCode(code: string) {
-  await AsyncStorage.setItem(SELECTED_CITY_CODE_KEY, code);
+  await setSelectedCityCode(code);
 }
 
 export function searchIndonesiaCities(query: string) {

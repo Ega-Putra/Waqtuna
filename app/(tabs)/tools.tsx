@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import {
   Feather,
   FontAwesome6,
@@ -6,7 +7,7 @@ import {
   MaterialIcons,
 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const mapImage =
   'https://www.figma.com/api/mcp/asset/815ef910-5505-484b-94fc-60804c0f6858';
@@ -21,40 +22,52 @@ const toolCards = [
   {
     key: 'quran',
     title: 'Al-Quran',
+    route: './quran',
     icon: <MaterialCommunityIcons name="book-open-page-variant-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'ai',
     title: 'Tanya\nAI',
+    route: './ai',
     icon: <MaterialCommunityIcons name="robot-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'kiblat',
     title: 'Kiblat',
+    route: './qibla',
     icon: <MaterialCommunityIcons name="compass-outline" size={54} color="#FFFFFF" />,
   },
   {
     key: 'zakat',
     title: 'Zakat\nKalkulator',
+    route: './zakat',
     icon: <FontAwesome6 name="hand-holding-dollar" size={46} color="#FFFFFF" />,
   },
-];
+] as const;
 
 function MosqueRow({ name }: { name: string }) {
   return (
-    <View style={styles.mosqueRow}>
+    <Pressable style={styles.mosqueRow} onPress={() => router.push('./mosque')}>
       <Text style={styles.mosqueRowText}>{name}</Text>
       <Feather name="send" size={24} color="#FFFFFF" />
-    </View>
+    </Pressable>
   );
 }
 
-function ToolCard({ title, icon }: { title: string; icon: React.ReactNode }) {
+function ToolCard({
+  title,
+  icon,
+  route,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  route: (typeof toolCards)[number]['route'];
+}) {
   return (
-    <View style={styles.toolCard}>
+    <Pressable style={styles.toolCard} onPress={() => router.push(route)}>
       {icon}
       <Text style={styles.toolCardText}>{title}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -67,7 +80,7 @@ export default function ToolsScreen() {
         showsVerticalScrollIndicator={false}>
         <Text style={styles.appTitle}>Waqtuna</Text>
 
-        <View style={styles.nearbyCard}>
+        <Pressable style={styles.nearbyCard} onPress={() => router.push('./mosque')}>
           <Text style={styles.nearbyTitle}>Masjid Terdekat</Text>
 
           <View style={styles.mapWrap}>
@@ -82,11 +95,11 @@ export default function ToolsScreen() {
               <MosqueRow key={mosque} name={mosque} />
             ))}
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.toolsGrid}>
           {toolCards.map((card) => (
-            <ToolCard key={card.key} title={card.title} icon={card.icon} />
+            <ToolCard key={card.key} title={card.title} icon={card.icon} route={card.route} />
           ))}
         </View>
       </ScrollView>

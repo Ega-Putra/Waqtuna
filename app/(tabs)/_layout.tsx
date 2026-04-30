@@ -12,13 +12,13 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: '#000000',
-        tabBarInactiveTintColor: '#000000',
+        tabBarActiveTintColor: '#007322',
+        tabBarInactiveTintColor: '#6B746C',
         tabBarLabelStyle: styles.tabLabel,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
         tabBarButton: (props: BottomTabBarButtonProps) => <HapticTab {...props} />,
-        tabBarActiveBackgroundColor: '#AEB7A6',
+        tabBarActiveBackgroundColor: 'transparent',
         tabBarInactiveBackgroundColor: 'transparent',
       }}>
       <Tabs.Screen
@@ -26,7 +26,7 @@ export default function TabLayout() {
         options={{
           title: 'Pengingat',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="alarm-light-outline" size={40} color={color} />
+            <MaterialCommunityIcons name="alarm-check" size={24} color={color} />
           ),
         }}
       />
@@ -35,7 +35,7 @@ export default function TabLayout() {
         options={{
           title: 'Alat Bantu',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="home-city-outline" size={40} color={color} />
+            <MaterialCommunityIcons name="apps" size={24} color={color} />
           ),
         }}
       />
@@ -43,7 +43,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Pengaturan',
-          tabBarIcon: ({ color }) => <MaterialIcons name="settings" size={40} color={color} />,
+          tabBarIcon: ({ color }) => <MaterialIcons name="settings" size={24} color={color} />,
         }}
       />
     </Tabs>
@@ -52,29 +52,29 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 80,
+    height: 72,
     backgroundColor: '#E7F0DE',
     borderTopWidth: 0,
-    paddingHorizontal: 22,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
     shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 18,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
   },
   tabItem: {
-    marginHorizontal: 10,
-    marginVertical: 6,
-    borderRadius: 8,
+    marginHorizontal: 6,
+    marginVertical: 2,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 4,
   },
 });

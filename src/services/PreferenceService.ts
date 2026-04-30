@@ -10,6 +10,7 @@ export const PreferenceStorageKeys = {
   initialCoordinates: 'waqtuna.initial-coordinates',
   locationRequested: 'waqtuna.location-requested',
   notificationSettings: 'waqtuna.prayer-notification-settings',
+  fastingReminderSettings: 'waqtuna.fasting-reminder-settings',
   selectedCityCode: 'waqtuna.selected-city-code',
 } as const;
 
@@ -21,6 +22,11 @@ export type AppPreferences = {
   clockFormat: ClockFormat;
   calculationMethod: CalculationMethodPreference;
   asrMadhab: AsrMadhabPreference;
+};
+
+export type FastingReminderSettings = {
+  mondayThursdayEnabled: boolean;
+  ayyamulBidhEnabled: boolean;
 };
 
 export const defaultPrayerNotificationSettings: PrayerNotificationSettings = {
@@ -39,6 +45,11 @@ export const defaultAppPreferences: AppPreferences = {
   clockFormat: '24h',
   calculationMethod: 'kemenag',
   asrMadhab: 'shafi',
+};
+
+export const defaultFastingReminderSettings: FastingReminderSettings = {
+  mondayThursdayEnabled: false,
+  ayyamulBidhEnabled: false,
 };
 
 export async function getAppPreferences(): Promise<AppPreferences> {
@@ -93,6 +104,18 @@ export async function updatePrayerNotificationSettings(
   await setPrayerNotificationSettings(nextSettings);
 
   return nextSettings;
+}
+
+export async function getFastingReminderSettings(): Promise<FastingReminderSettings> {
+  const rawValue = await AsyncStorage.getItem(PreferenceStorageKeys.fastingReminderSettings);
+
+  return parseFastingReminderSettings(rawValue);
+}
+
+export async function setFastingReminderSettings(
+  settings: FastingReminderSettings
+): Promise<void> {
+  await AsyncStorage.setItem(PreferenceStorageKeys.fastingReminderSettings, JSON.stringify(settings));
 }
 
 export async function getSelectedCityCode(): Promise<string | null> {
@@ -164,6 +187,29 @@ function parsePrayerNotificationSettings(rawValue: string | null): PrayerNotific
     };
   } catch {
     return defaultPrayerNotificationSettings;
+  }
+}
+
+function parseFastingReminderSettings(rawValue: string | null): FastingReminderSettings {
+  if (!rawValue) {
+    return defaultFastingReminderSettings;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as Partial<FastingReminderSettings>;
+
+    return {
+      mondayThursdayEnabled:
+        typeof parsed.mondayThursdayEnabled === 'boolean'
+          ? parsed.mondayThursdayEnabled
+          : defaultFastingReminderSettings.mondayThursdayEnabled,
+      ayyamulBidhEnabled:
+        typeof parsed.ayyamulBidhEnabled === 'boolean'
+          ? parsed.ayyamulBidhEnabled
+          : defaultFastingReminderSettings.ayyamulBidhEnabled,
+    };
+  } catch {
+    return defaultFastingReminderSettings;
   }
 }
 

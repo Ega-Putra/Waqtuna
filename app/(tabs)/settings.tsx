@@ -24,17 +24,22 @@ import {
 } from '@/utils/location';
 import { getPrayerSchedule } from '@/utils/prayer';
 import { rescheduleAll, type PrayerNotificationKey } from '@/src/services/NotificationService';
+import { PuasaReminderService } from '@/src/services/PuasaReminderService';
 import {
   defaultAppPreferences,
+  defaultFastingReminderSettings,
   defaultPrayerNotificationSettings,
   getAppPreferences,
+  getFastingReminderSettings,
   getPrayerNotificationSettings,
   getSelectedCityCode,
   setAppPreferences,
+  setFastingReminderSettings,
   setPrayerNotificationSettings,
   type AppPreferences,
   type AsrMadhabPreference,
   type CalculationMethodPreference,
+  type FastingReminderSettings,
 } from '@/src/services/PreferenceService';
 
 const reminderOptions = [5, 10, 15, 30];
@@ -65,6 +70,8 @@ export default function SettingsScreen() {
   const [notificationSettings, setNotificationSettings] = useState(
     defaultPrayerNotificationSettings
   );
+  const [fastingReminderSettings, setFastingReminderSettingsState] =
+    useState<FastingReminderSettings>(defaultFastingReminderSettings);
   const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
@@ -73,9 +80,15 @@ export default function SettingsScreen() {
     let isMounted = true;
 
     async function loadPreferences() {
-      const [storedPreferences, storedNotificationSettings, selectedCityCode] = await Promise.all([
+      const [
+        storedPreferences,
+        storedNotificationSettings,
+        storedFastingReminderSettings,
+        selectedCityCode,
+      ] = await Promise.all([
         getAppPreferences(),
         getPrayerNotificationSettings(),
+        getFastingReminderSettings(),
         getSelectedCityCode(),
       ]);
 
@@ -85,6 +98,7 @@ export default function SettingsScreen() {
 
       setPreferences(storedPreferences);
       setNotificationSettings(storedNotificationSettings);
+      setFastingReminderSettingsState(storedFastingReminderSettings);
       setSelectedCity(selectedCityCode ? findCityByCode(selectedCityCode) ?? defaultIndonesiaCity : defaultIndonesiaCity);
     }
 
@@ -106,6 +120,12 @@ export default function SettingsScreen() {
     setNotificationSettings(nextSettings);
     await setPrayerNotificationSettings(nextSettings);
     await reschedulePrayerNotifications(nextSettings, selectedCity);
+  }
+
+  async function persistFastingReminderSettings(nextSettings: FastingReminderSettings) {
+    setFastingReminderSettingsState(nextSettings);
+    await setFastingReminderSettings(nextSettings);
+    await PuasaReminderService.scheduleAll(nextSettings);
   }
 
   async function handleSelectCity(city: IndonesiaCity) {
@@ -187,6 +207,30 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
+
+          <ToggleRow
+            title="Puasa Senin-Kamis"
+            description="Reminder malam sebelumnya dan waktu sahur"
+            value={fastingReminderSettings.mondayThursdayEnabled}
+            onValueChange={(mondayThursdayEnabled) =>
+              void persistFastingReminderSettings({
+                ...fastingReminderSettings,
+                mondayThursdayEnabled,
+              })
+            }
+          />
+
+          <ToggleRow
+            title="Ayyamul Bidh"
+            description="Reminder sebelum tanggal 13-15 bulan Hijriah"
+            value={fastingReminderSettings.ayyamulBidhEnabled}
+            onValueChange={(ayyamulBidhEnabled) =>
+              void persistFastingReminderSettings({
+                ...fastingReminderSettings,
+                ayyamulBidhEnabled,
+              })
+            }
+          />
         </Section>
 
         <Section title="Perhitungan">

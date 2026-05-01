@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -66,6 +67,7 @@ const madhabOptions: { value: AsrMadhabPreference; label: string }[] = [
 ];
 
 export default function SettingsScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
   const [preferences, setPreferences] = useState<AppPreferences>(defaultAppPreferences);
   const [notificationSettings, setNotificationSettings] = useState(
     defaultPrayerNotificationSettings
@@ -140,7 +142,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: tabBarHeight + 28 }]}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.appTitle}>Pengaturan</Text>
 

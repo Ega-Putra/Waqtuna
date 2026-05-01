@@ -37,7 +37,7 @@ export async function getShalatWidgetData(date = new Date()): Promise<ShalatWidg
       }
     );
 
-    const prayer = getFocusPrayer(schedule.prayers, checklist, schedule.nextPrayerName);
+    const prayer = getCurrentPrayerWindow(schedule.prayers, date);
 
     return {
       title: 'Waqtuna',
@@ -53,16 +53,13 @@ export async function getShalatWidgetData(date = new Date()): Promise<ShalatWidg
   }
 }
 
-function getFocusPrayer(
-  prayers: PrayerScheduleItem[],
-  checklist: Record<string, boolean>,
-  nextPrayerName: string
-) {
-  return (
-    prayers.find((prayer) => !checklist[prayer.name]) ??
-    prayers.find((prayer) => prayer.name === nextPrayerName) ??
-    prayers[0]
-  );
+function getCurrentPrayerWindow(prayers: PrayerScheduleItem[], date: Date) {
+  const currentPrayer = prayers
+    .slice()
+    .reverse()
+    .find((prayer) => createPrayerDate(prayer.time24h, date) <= date);
+
+  return currentPrayer ?? prayers[prayers.length - 1] ?? prayers[0];
 }
 
 function formatCountdownLabel(value: string) {
@@ -82,4 +79,15 @@ function formatLocationLabel(cityName: string) {
     .trim();
 
   return `${sanitized}, Idn`;
+}
+
+function createPrayerDate(time: string, baseDate: Date) {
+  const [hourRaw, minuteRaw] = time.split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  const date = new Date(baseDate);
+
+  date.setHours(Number.isFinite(hour) ? hour : 0, Number.isFinite(minute) ? minute : 0, 0, 0);
+
+  return date;
 }

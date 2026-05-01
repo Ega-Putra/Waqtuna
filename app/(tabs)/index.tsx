@@ -4,6 +4,7 @@ import {
   MaterialIcons,
 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -30,6 +31,11 @@ import {
 } from '@/utils/location';
 import { usePrayerNotificationSettings } from '@/src/hooks/usePrayerNotificationSettings';
 import { rescheduleAll } from '@/src/services/NotificationService';
+import {
+  defaultAppPreferences,
+  getAppPreferences,
+  type AppPreferences,
+} from '@/src/services/PreferenceService';
 import {
   getDailyChecklist,
   getDailyProgress,
@@ -129,10 +135,14 @@ export default function HomeScreen() {
   const [streak, setStreak] = useState(0);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
+  const [preferences, setPreferences] = useState<AppPreferences>(defaultAppPreferences);
   const [schedule, setSchedule] = useState(() =>
     getPrayerSchedule({
       latitude: defaultIndonesiaCity.latitude,
       longitude: defaultIndonesiaCity.longitude,
+    }, new Date(), {
+      calculationMethod: defaultAppPreferences.calculationMethod,
+      asrMadhab: defaultAppPreferences.asrMadhab,
     })
   );
 
@@ -154,18 +164,29 @@ export default function HomeScreen() {
 
     async function loadInitialLocation() {
       try {
-        const initialLocation = await getInitialLocationState();
+        const [initialLocation, storedPreferences] = await Promise.all([
+          getInitialLocationState(),
+          getAppPreferences(),
+        ]);
 
         if (!isMounted) {
           return;
         }
 
         setSelectedCity(initialLocation.city);
+        setPreferences(storedPreferences);
         setSchedule(
-          getPrayerSchedule({
-            latitude: initialLocation.city.latitude,
-            longitude: initialLocation.city.longitude,
-          })
+          getPrayerSchedule(
+            {
+              latitude: initialLocation.city.latitude,
+              longitude: initialLocation.city.longitude,
+            },
+            new Date(),
+            {
+              calculationMethod: storedPreferences.calculationMethod,
+              asrMadhab: storedPreferences.asrMadhab,
+            }
+          )
         );
         setLocationError(null);
       } catch {
@@ -174,11 +195,19 @@ export default function HomeScreen() {
         }
 
         setSelectedCity(defaultIndonesiaCity);
+        setPreferences(defaultAppPreferences);
         setSchedule(
-          getPrayerSchedule({
-            latitude: defaultIndonesiaCity.latitude,
-            longitude: defaultIndonesiaCity.longitude,
-          })
+          getPrayerSchedule(
+            {
+              latitude: defaultIndonesiaCity.latitude,
+              longitude: defaultIndonesiaCity.longitude,
+            },
+            new Date(),
+            {
+              calculationMethod: defaultAppPreferences.calculationMethod,
+              asrMadhab: defaultAppPreferences.asrMadhab,
+            }
+          )
         );
         setLocationError('Lokasi tidak bisa dimuat. Jadwal memakai kota default Surabaya.');
       } finally {
@@ -195,12 +224,64 @@ export default function HomeScreen() {
     };
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function syncOnFocus() {
+        try {
+          const [nextLocation, nextPreferences] = await Promise.all([
+            getInitialLocationState(),
+            getAppPreferences(),
+          ]);
+
+          if (!isActive) {
+            return;
+          }
+
+          setSelectedCity(nextLocation.city);
+          setPreferences(nextPreferences);
+          setSchedule(
+            getPrayerSchedule(
+              {
+                latitude: nextLocation.city.latitude,
+                longitude: nextLocation.city.longitude,
+              },
+              new Date(),
+              {
+                calculationMethod: nextPreferences.calculationMethod,
+                asrMadhab: nextPreferences.asrMadhab,
+              }
+            )
+          );
+          setLocationError(null);
+        } catch {
+          if (!isActive) {
+            return;
+          }
+
+          setPreferences(defaultAppPreferences);
+          setLocationError('Lokasi tidak bisa dimuat. Jadwal memakai kota default Surabaya.');
+        }
+      }
+
+      void syncOnFocus();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
   useEffect(() => {
     const interval = setInterval(() => {
       setSchedule(
         getPrayerSchedule({
           latitude: selectedCity.latitude,
           longitude: selectedCity.longitude,
+        }, new Date(), {
+          calculationMethod: preferences.calculationMethod,
+          asrMadhab: preferences.asrMadhab,
         })
       );
     }, 1_000);
@@ -208,7 +289,7 @@ export default function HomeScreen() {
     return () => {
       clearInterval(interval);
     };
-  }, [selectedCity]);
+  }, [preferences.asrMadhab, preferences.calculationMethod, selectedCity]);
 
   useEffect(() => {
     let isActive = true;
@@ -251,6 +332,9 @@ export default function HomeScreen() {
       const currentSchedule = getPrayerSchedule({
         latitude: selectedCity.latitude,
         longitude: selectedCity.longitude,
+      }, new Date(), {
+        calculationMethod: preferences.calculationMethod,
+        asrMadhab: preferences.asrMadhab,
       });
 
       await rescheduleAll(currentSchedule.prayers, notificationSettings);
@@ -277,7 +361,14 @@ export default function HomeScreen() {
         clearTimeout(midnightTimer);
       }
     };
-  }, [isBootstrapping, isNotificationSettingsLoading, notificationSettings, selectedCity]);
+  }, [
+    isBootstrapping,
+    isNotificationSettingsLoading,
+    notificationSettings,
+    preferences.asrMadhab,
+    preferences.calculationMethod,
+    selectedCity,
+  ]);
 
   const filteredCities = searchIndonesiaCities(cityQuery);
 
@@ -287,6 +378,9 @@ export default function HomeScreen() {
       getPrayerSchedule({
         latitude: city.latitude,
         longitude: city.longitude,
+      }, new Date(), {
+        calculationMethod: preferences.calculationMethod,
+        asrMadhab: preferences.asrMadhab,
       })
     );
     setIsLocationPickerVisible(false);

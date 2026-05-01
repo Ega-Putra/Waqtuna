@@ -2,6 +2,7 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Linking,
   Modal,
@@ -42,6 +43,7 @@ import {
   type CalculationMethodPreference,
   type FastingReminderSettings,
 } from '@/src/services/PreferenceService';
+import { Toast } from '@/src/components/ui/Toast';
 
 const reminderOptions = [5, 10, 15, 30];
 
@@ -77,6 +79,8 @@ export default function SettingsScreen() {
   const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isToastVisible, setIsToastVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -113,15 +117,34 @@ export default function SettingsScreen() {
 
   const filteredCities = useMemo(() => searchIndonesiaCities(cityQuery), [cityQuery]);
 
-  async function persistPreferences(nextPreferences: AppPreferences) {
+  function showToast(message: string) {
+    setToastMessage(message);
+    setIsToastVisible(true);
+  }
+
+  async function persistPreferences(
+    nextPreferences: AppPreferences,
+    options?: {
+      shouldRescheduleNotifications?: boolean;
+      successToast?: string;
+    }
+  ) {
     setPreferences(nextPreferences);
     await setAppPreferences(nextPreferences);
+
+    if (options?.shouldRescheduleNotifications) {
+      await reschedulePrayerNotifications(notificationSettings, selectedCity, nextPreferences);
+    }
+
+    if (options?.successToast) {
+      showToast(options.successToast);
+    }
   }
 
   async function persistNotificationSettings(nextSettings: typeof notificationSettings) {
     setNotificationSettings(nextSettings);
     await setPrayerNotificationSettings(nextSettings);
-    await reschedulePrayerNotifications(nextSettings, selectedCity);
+    await reschedulePrayerNotifications(nextSettings, selectedCity, preferences);
   }
 
   async function persistFastingReminderSettings(nextSettings: FastingReminderSettings) {
@@ -135,7 +158,19 @@ export default function SettingsScreen() {
     setIsLocationPickerVisible(false);
     setCityQuery('');
     await persistSelectedCityCode(city.code);
-    await reschedulePrayerNotifications(notificationSettings, city);
+    await reschedulePrayerNotifications(notificationSettings, city, preferences);
+    showToast(`Kota diperbarui ke ${getLocationLabel(city)}`);
+  }
+
+  async function handleOpenNotificationSettings() {
+    try {
+      await Linking.openSettings();
+    } catch {
+      Alert.alert(
+        'Tidak dapat membuka Pengaturan',
+        'Buka Pengaturan perangkat secara manual untuk mengatur izin notifikasi.'
+      );
+    }
   }
 
   return (
@@ -244,12 +279,22 @@ export default function SettingsScreen() {
                   key={option.value}
                   label={option.label}
                   isSelected={preferences.calculationMethod === option.value}
-                  onPress={() =>
-                    void persistPreferences({
-                      ...preferences,
-                      calculationMethod: option.value,
-                    })
-                  }
+                  onPress={() => {
+                    if (preferences.calculationMethod === option.value) {
+                      return;
+                    }
+
+                    void persistPreferences(
+                      {
+                        ...preferences,
+                        calculationMethod: option.value,
+                      },
+                      {
+                        shouldRescheduleNotifications: true,
+                        successToast: 'Jadwal sholat diperbarui',
+                      }
+                    );
+                  }}
                 />
               ))}
             </View>
@@ -263,12 +308,22 @@ export default function SettingsScreen() {
                   key={option.value}
                   label={option.label}
                   isSelected={preferences.asrMadhab === option.value}
-                  onPress={() =>
-                    void persistPreferences({
-                      ...preferences,
-                      asrMadhab: option.value,
-                    })
-                  }
+                  onPress={() => {
+                    if (preferences.asrMadhab === option.value) {
+                      return;
+                    }
+
+                    void persistPreferences(
+                      {
+                        ...preferences,
+                        asrMadhab: option.value,
+                      },
+                      {
+                        shouldRescheduleNotifications: true,
+                        successToast: 'Jadwal sholat diperbarui',
+                      }
+                    );
+                  }}
                 />
               ))}
             </View>
@@ -296,13 +351,22 @@ export default function SettingsScreen() {
 
           <Pressable
             style={styles.secondaryButton}
-            onPress={() => void Linking.openSettings()}
+            onPress={() => void handleOpenNotificationSettings()}
             accessibilityRole="button">
             <MaterialCommunityIcons name="bell-cog-outline" size={20} color="#007322" />
             <Text style={styles.secondaryButtonText}>Kelola Izin Notifikasi</Text>
           </Pressable>
         </Section>
       </ScrollView>
+
+      <Toast
+        message={toastMessage}
+        visible={isToastVisible}
+        onHide={() => {
+          setIsToastVisible(false);
+          setToastMessage(null);
+        }}
+      />
 
       <Modal
         visible={isLocationPickerVisible}
@@ -439,12 +503,20 @@ function OptionButton({
 
 async function reschedulePrayerNotifications(
   settings: typeof defaultPrayerNotificationSettings,
-  city: IndonesiaCity
+  city: IndonesiaCity,
+  prefs: AppPreferences
 ) {
-  const schedule = getPrayerSchedule({
-    latitude: city.latitude,
-    longitude: city.longitude,
-  });
+  const schedule = getPrayerSchedule(
+    {
+      latitude: city.latitude,
+      longitude: city.longitude,
+    },
+    new Date(),
+    {
+      calculationMethod: prefs.calculationMethod,
+      asrMadhab: prefs.asrMadhab,
+    }
+  );
 
   await rescheduleAll(schedule.prayers, settings);
 }

@@ -6,6 +6,8 @@ import {
   PrayerTimes,
 } from 'adhan';
 
+import type { AppPreferences } from '@/src/services/PreferenceService';
+
 export type PrayerScheduleItem = {
   key: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
   name: string;
@@ -20,12 +22,15 @@ export type PrayerSchedule = {
   countdownText: string;
 };
 
+type PrayerSchedulePreferences = Pick<AppPreferences, 'calculationMethod' | 'asrMadhab'>;
+
 export function getPrayerSchedule(
   coordinates: { latitude: number; longitude: number },
-  date = new Date()
+  date = new Date(),
+  preferences?: PrayerSchedulePreferences
 ): PrayerSchedule {
-  const params = CalculationMethod.Singapore();
-  params.madhab = Madhab.Shafi;
+  const params = getCalculationParameters(preferences?.calculationMethod);
+  params.madhab = preferences?.asrMadhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi;
 
   const prayerTimes = new PrayerTimes(
     new Coordinates(coordinates.latitude, coordinates.longitude),
@@ -50,6 +55,25 @@ export function getPrayerSchedule(
     nextPrayerHeroTime: formatHeroTime(nextPrayer.time),
     countdownText: formatCountdown(nextPrayer.time, date, getPrayerDisplayName(nextPrayer.key)),
   };
+}
+
+function getCalculationParameters(
+  method: PrayerSchedulePreferences['calculationMethod'] | undefined
+) {
+  switch (method) {
+    case 'muslimWorldLeague':
+      return CalculationMethod.MuslimWorldLeague();
+    case 'isna':
+      return CalculationMethod.NorthAmerica();
+    case 'egypt':
+      return CalculationMethod.Egyptian();
+    case 'karachi':
+      return CalculationMethod.Karachi();
+    case 'kemenag':
+    default:
+      // Adhan has no dedicated Kemenag preset; Singapore is closest for Indonesia.
+      return CalculationMethod.Singapore();
+  }
 }
 
 function createPrayerItem(

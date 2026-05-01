@@ -331,7 +331,9 @@ export default function HomeScreen() {
             style={styles.locationChip}
             onPress={() => setIsLocationPickerVisible(true)}
             accessibilityRole="button">
-            <Ionicons name="location" size={15} color="#FFFFFF" />
+            <View style={styles.locationIconWrap}>
+              <Ionicons name="location" size={13} color="#FFFFFF" />
+            </View>
             <Text style={styles.locationText} numberOfLines={1}>
               {getLocationLabel(selectedCity)}
             </Text>
@@ -662,24 +664,25 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xl,
     paddingBottom: 100,
   },
   fixedHeader: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl + spacing.sm,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
   headerTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
   },
   headerCopy: {
     flex: 1,
+    paddingRight: spacing.xs,
   },
   appTitle: {
     color: '#007322',
@@ -697,8 +700,8 @@ const styles = StyleSheet.create({
   greeting: {
     color: '#FFFFFF',
     fontSize: typography.fontSizeLG,
-    lineHeight: typography.fontSizeLG * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightSemiBold,
+    lineHeight: typography.fontSizeLG * typography.lineHeightTight,
+    fontWeight: typography.fontWeightExtraBold,
   },
   hijriDate: {
     color: colors.accent,
@@ -741,7 +744,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizeSM,
     lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
     fontWeight: typography.fontWeightBold,
-    maxWidth: 130,
+    maxWidth: 128,
   },
   locationChip: {
     flexDirection: 'row',
@@ -749,11 +752,20 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     maxWidth: 178,
     borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.sm + 2,
+    paddingVertical: spacing.xs + 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.24)',
+  },
+  locationIconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   locationErrorCard: {
     backgroundColor: '#FFF7D6',
@@ -851,7 +863,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     padding: spacing.xl,
-    marginTop: -spacing.xxl,
+    marginTop: 0,
     marginBottom: spacing.xl,
     borderWidth: 1,
     borderColor: colors.border,

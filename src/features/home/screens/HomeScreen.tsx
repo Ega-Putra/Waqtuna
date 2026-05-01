@@ -3,11 +3,9 @@ import {
   MaterialCommunityIcons,
   MaterialIcons,
 } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Animated,
   FlatList,
   Modal,
   Pressable,
@@ -19,23 +17,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
-import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
-import { colors, radius, shadows, spacing, typography } from '@/theme';
-import {
-  defaultIndonesiaCity,
-  getInitialLocationState,
-  getLocationLabel,
-  persistSelectedCityCode,
-  searchIndonesiaCities,
-} from '@/shared/utils/location';
 import { usePrayerNotificationSettings } from '@/features/home/hooks/usePrayerNotificationSettings';
-import { rescheduleAll } from '@/services/NotificationService';
-import {
-  defaultAppPreferences,
-  getAppPreferences,
-  type AppPreferences,
-} from '@/services/PreferenceService';
+import { rescheduleAll, type PrayerNotificationKey } from '@/services/NotificationService';
 import {
   getDailyChecklist,
   getDailyProgress,
@@ -45,88 +28,125 @@ import {
   type PrayerChecklist,
 } from '@/services/PrayerChecklistService';
 import {
+  defaultAppPreferences,
+  getAppPreferences,
+  type AppPreferences,
+} from '@/services/PreferenceService';
+import {
   updateAllHomeWidgets,
   updateChecklistWidget,
 } from '@/services/WidgetUpdateService';
+import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
+import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
+import {
+  defaultIndonesiaCity,
+  getInitialLocationState,
+  persistSelectedCityCode,
+  searchIndonesiaCities,
+} from '@/shared/utils/location';
 import { getPrayerSchedule, type PrayerScheduleItem } from '@/shared/utils/prayer';
 import { getCalendarDateParts } from '@/shared/utils/time';
+import { colors, radius, shadows, spacing, typography } from '@/theme';
 
-const prayerIcons: Record<PrayerScheduleItem['key'], React.ReactNode> = {
-  fajr: <MaterialCommunityIcons name="weather-sunset-up" size={24} color={colors.primary} />,
-  dhuhr: <MaterialCommunityIcons name="white-balance-sunny" size={24} color={colors.primary} />,
-  asr: <MaterialCommunityIcons name="weather-partly-cloudy" size={24} color={colors.primary} />,
-  maghrib: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={24} color={colors.primary} />,
-  isha: <MaterialCommunityIcons name="moon-waning-crescent" size={24} color={colors.primary} />,
+const STREAK_DOT_COUNT = 8;
+
+const prayerVisuals: Record<
+  PrayerScheduleItem['key'],
+  {
+    icon: keyof typeof MaterialCommunityIcons.glyphMap;
+    notificationKey: PrayerNotificationKey;
+  }
+> = {
+  fajr: {
+    icon: 'weather-sunset-up',
+    notificationKey: 'subuh',
+  },
+  dhuhr: {
+    icon: 'white-balance-sunny',
+    notificationKey: 'dzuhur',
+  },
+  asr: {
+    icon: 'weather-partly-cloudy',
+    notificationKey: 'ashar',
+  },
+  maghrib: {
+    icon: 'weather-night-partly-cloudy',
+    notificationKey: 'maghrib',
+  },
+  isha: {
+    icon: 'moon-waning-crescent',
+    notificationKey: 'isya',
+  },
 };
 
-const prayerArabicNames: Record<PrayerScheduleItem['key'], string> = {
-  fajr: 'الفجر',
-  dhuhr: 'الظهر',
-  asr: 'العصر',
-  maghrib: 'المغرب',
-  isha: 'العشاء',
-};
-
-function PrayerReminderCard({
-  prayerKey,
-  name,
-  time,
-  icon,
-  status,
+function PrayerReminderRow({
+  prayer,
   isChecked,
+  isNotificationEnabled,
   onToggle,
+  onToggleNotification,
 }: {
-  prayerKey: PrayerScheduleItem['key'];
-  name: string;
-  time: string;
-  icon: React.ReactNode;
-  status: 'past' | 'next' | 'upcoming';
-  isChecked?: boolean;
+  prayer: PrayerScheduleItem;
+  isChecked: boolean;
+  isNotificationEnabled: boolean;
   onToggle: () => void;
+  onToggleNotification: () => void;
 }) {
-  const isNext = status === 'next';
-  const isPast = status === 'past';
+  const iconName = prayerVisuals[prayer.key].icon;
 
   return (
-    <View
-      style={[
-        styles.prayerCard,
-        isNext && styles.prayerCardActive,
-        isPast && styles.prayerCardPast,
-      ]}>
-      <View style={[styles.prayerIconWrap, isNext && styles.prayerIconWrapActive]}>
-        {isNext ? clonePrayerIcon(prayerKey, '#FFFFFF') : icon}
+    <View style={[styles.reminderItem, isChecked && styles.reminderItemChecked]}>
+      <View style={styles.reminderInfo}>
+        <View style={styles.reminderIconWrap}>
+          <MaterialCommunityIcons name={iconName} size={28} color="#FFFFFF" />
+        </View>
+
+        <View style={styles.reminderCopy}>
+          <Text style={styles.reminderPrayerName}>{prayer.name}</Text>
+          <Text style={styles.reminderPrayerTime}>{prayer.time}</Text>
+        </View>
       </View>
 
-      <Text style={[styles.prayerArabicName, isNext && styles.prayerCardTextActive]}>
-        {prayerArabicNames[prayerKey]}
-      </Text>
-      <Text style={[styles.prayerName, isNext && styles.prayerCardTextActive]}>{name}</Text>
-      <Text style={[styles.prayerTime, isNext && styles.prayerCardTextActive]}>{time}</Text>
+      <View style={styles.reminderActions}>
+        <Pressable
+          style={[
+            styles.notificationButton,
+            isNotificationEnabled && styles.notificationButtonActive,
+          ]}
+          onPress={onToggleNotification}
+          accessibilityRole="button"
+          accessibilityLabel={`Atur notifikasi sholat ${prayer.name}`}>
+          <MaterialCommunityIcons
+            name={isNotificationEnabled ? 'bell-ring-outline' : 'bell-off-outline'}
+            size={22}
+            color={isNotificationEnabled ? colors.primary : '#FFFFFF'}
+          />
+        </Pressable>
 
-      <Pressable
-        style={[
-          styles.checkButton,
-          isNext && styles.checkButtonActiveCard,
-          isChecked && styles.checkButtonChecked,
-        ]}
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityLabel={`Tandai sholat ${name}`}>
-        <MaterialIcons
-          name={isChecked ? 'check-circle' : 'radio-button-unchecked'}
-          size={22}
-          color={isNext ? '#FFFFFF' : isChecked ? colors.primary : colors.textMuted}
-        />
-      </Pressable>
+        <Pressable
+          style={[styles.reminderCheckButton, isChecked && styles.reminderCheckButtonChecked]}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={`Tandai sholat ${prayer.name}`}>
+          <MaterialIcons
+            name="check"
+            size={20}
+            color={isChecked ? colors.primary : '#97A6A0'}
+          />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 export default function HomeScreen() {
   const { gregorianDate, hijriDate } = getCalendarDateParts();
-  const { settings: notificationSettings, isLoading: isNotificationSettingsLoading } =
-    usePrayerNotificationSettings();
+  const {
+    settings: notificationSettings,
+    isLoading: isNotificationSettingsLoading,
+    setNotificationsEnabled,
+    setPrayerEnabled,
+  } = usePrayerNotificationSettings();
   const [selectedCity, setSelectedCity] = useState<IndonesiaCity>(defaultIndonesiaCity);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -137,14 +157,18 @@ export default function HomeScreen() {
   const [cityQuery, setCityQuery] = useState('');
   const [preferences, setPreferences] = useState<AppPreferences>(defaultAppPreferences);
   const [schedule, setSchedule] = useState(() =>
-    getPrayerSchedule({
-      latitude: defaultIndonesiaCity.latitude,
-      longitude: defaultIndonesiaCity.longitude,
-    }, new Date(), {
-      calculationMethod: defaultAppPreferences.calculationMethod,
-      asrMadhab: defaultAppPreferences.asrMadhab,
-      clockFormat: defaultAppPreferences.clockFormat,
-    })
+    getPrayerSchedule(
+      {
+        latitude: defaultIndonesiaCity.latitude,
+        longitude: defaultIndonesiaCity.longitude,
+      },
+      new Date(),
+      {
+        calculationMethod: defaultAppPreferences.calculationMethod,
+        asrMadhab: defaultAppPreferences.asrMadhab,
+        clockFormat: defaultAppPreferences.clockFormat,
+      }
+    )
   );
 
   const refreshChecklistState = useCallback(async () => {
@@ -163,7 +187,7 @@ export default function HomeScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadInitialLocation() {
+    async function loadInitialState() {
       try {
         const [initialLocation, storedPreferences] = await Promise.all([
           getInitialLocationState(),
@@ -220,7 +244,7 @@ export default function HomeScreen() {
       }
     }
 
-    void loadInitialLocation();
+    void loadInitialState();
 
     return () => {
       isMounted = false;
@@ -280,14 +304,18 @@ export default function HomeScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       setSchedule(
-        getPrayerSchedule({
-          latitude: selectedCity.latitude,
-          longitude: selectedCity.longitude,
-        }, new Date(), {
-          calculationMethod: preferences.calculationMethod,
-          asrMadhab: preferences.asrMadhab,
-          clockFormat: preferences.clockFormat,
-        })
+        getPrayerSchedule(
+          {
+            latitude: selectedCity.latitude,
+            longitude: selectedCity.longitude,
+          },
+          new Date(),
+          {
+            calculationMethod: preferences.calculationMethod,
+            asrMadhab: preferences.asrMadhab,
+            clockFormat: preferences.clockFormat,
+          }
+        )
       );
     }, 1_000);
 
@@ -339,14 +367,18 @@ export default function HomeScreen() {
     let midnightTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function scheduleNotifications() {
-      const currentSchedule = getPrayerSchedule({
-        latitude: selectedCity.latitude,
-        longitude: selectedCity.longitude,
-      }, new Date(), {
-        calculationMethod: preferences.calculationMethod,
-        asrMadhab: preferences.asrMadhab,
-        clockFormat: preferences.clockFormat,
-      });
+      const currentSchedule = getPrayerSchedule(
+        {
+          latitude: selectedCity.latitude,
+          longitude: selectedCity.longitude,
+        },
+        new Date(),
+        {
+          calculationMethod: preferences.calculationMethod,
+          asrMadhab: preferences.asrMadhab,
+          clockFormat: preferences.clockFormat,
+        }
+      );
 
       await rescheduleAll(currentSchedule.prayers, notificationSettings);
     }
@@ -387,14 +419,18 @@ export default function HomeScreen() {
   async function handleSelectCity(city: IndonesiaCity) {
     setSelectedCity(city);
     setSchedule(
-      getPrayerSchedule({
-        latitude: city.latitude,
-        longitude: city.longitude,
-      }, new Date(), {
-        calculationMethod: preferences.calculationMethod,
-        asrMadhab: preferences.asrMadhab,
-        clockFormat: preferences.clockFormat,
-      })
+      getPrayerSchedule(
+        {
+          latitude: city.latitude,
+          longitude: city.longitude,
+        },
+        new Date(),
+        {
+          calculationMethod: preferences.calculationMethod,
+          asrMadhab: preferences.asrMadhab,
+          clockFormat: preferences.clockFormat,
+        }
+      )
     );
     setIsLocationPickerVisible(false);
     setCityQuery('');
@@ -406,7 +442,10 @@ export default function HomeScreen() {
   async function handleTogglePrayer(prayerName: string) {
     const today = new Date();
     const nextChecklist = await togglePrayer(today, prayerName);
-    const [progress, currentStreak] = await Promise.all([getDailyProgress(today), getStreak(today)]);
+    const [progress, currentStreak] = await Promise.all([
+      getDailyProgress(today),
+      getStreak(today),
+    ]);
 
     setPrayerChecklist(nextChecklist);
     setDailyProgress(progress);
@@ -414,45 +453,90 @@ export default function HomeScreen() {
     await updateChecklistWidget();
   }
 
+  async function handleTogglePrayerNotification(prayerKey: PrayerScheduleItem['key']) {
+    const notificationKey = prayerVisuals[prayerKey].notificationKey;
+    const currentValue = notificationSettings.enabledPrayers[notificationKey];
+    const nextValue = !currentValue;
+
+    if (nextValue && !notificationSettings.isEnabled) {
+      await setNotificationsEnabled(true);
+    }
+
+    await setPrayerEnabled(notificationKey, nextValue);
+  }
+
   const progressPercentage =
     dailyProgress.total > 0 ? (dailyProgress.checked / dailyProgress.total) * 100 : 0;
-  const countdownInfo = getCountdownInfo(schedule);
-  const prayerProgressPercentage = getPrayerWindowProgress(schedule.prayers, schedule.nextPrayerName);
-  const isUrgentCountdown = countdownInfo.totalMinutes < 10;
-
+  const nextPrayerTimeDisplay = schedule.nextPrayerHeroTime;
+  const countdownLabel = formatCountdownLabel(schedule.countdownText);
+  const locationLabel = useMemo(
+    () => formatLocationLabel(selectedCity),
+    [selectedCity]
+  );
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <LinearGradient
-        colors={[colors.primary, colors.primaryDark]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.fixedHeader}>
-        <View style={styles.headerTopRow}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>Assalamu Alaikum</Text>
-            <Text style={styles.dateTitle}>{gregorianDate}</Text>
-            <Text style={styles.hijriDate}>{hijriDate}</Text>
-          </View>
-
-          <Pressable
-            style={styles.locationChip}
-            onPress={() => setIsLocationPickerVisible(true)}
-            accessibilityRole="button">
-            <View style={styles.locationIconWrap}>
-              <Ionicons name="location" size={13} color="#FFFFFF" />
-            </View>
-            <Text style={styles.locationText} numberOfLines={1}>
-              {getLocationLabel(selectedCity)}
-            </Text>
-            <MaterialIcons name="keyboard-arrow-down" size={18} color="#FFFFFF" />
-          </Pressable>
-        </View>
-      </LinearGradient>
-
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
+        <Text style={styles.appTitle}>Waqtuna</Text>
+
+        <View style={styles.topSection}>
+          <View style={styles.overviewRow}>
+            <View style={styles.dateColumn}>
+              <Text style={styles.gregorianDate}>{gregorianDate}</Text>
+              <Text style={styles.hijriDate}>{hijriDate}</Text>
+
+              <Pressable
+                style={styles.locationChip}
+                onPress={() => setIsLocationPickerVisible(true)}
+                accessibilityRole="button">
+                <Ionicons name="location-sharp" size={16} color="#FFFFFF" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {locationLabel}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.streakCard}>
+              <View style={styles.streakPill}>
+                <Text style={styles.streakEmoji}>🔥</Text>
+                <Text style={styles.streakPillText}>{streak} Hari Beruntun</Text>
+              </View>
+
+              <View style={styles.streakDotsRow}>
+                {Array.from({ length: STREAK_DOT_COUNT }).map((_, index) => {
+                  const isComplete =
+                    index >= STREAK_DOT_COUNT - Math.min(streak, STREAK_DOT_COUNT);
+
+                  return (
+                    <View
+                      key={index}
+                      style={[
+                        styles.streakDot,
+                        isComplete && styles.streakDotComplete,
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressLabel}>
+                  {dailyProgress.checked} dari {dailyProgress.total} Sholat
+                </Text>
+                <Text style={styles.progressValue}>{Math.round(progressPercentage)}%</Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${progressPercentage}%` }]}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
         {locationError ? (
           <View style={styles.locationErrorCard}>
             <View style={styles.locationErrorHeader}>
@@ -469,94 +553,61 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <View style={styles.countdownCard}>
-          {isBootstrapping ? (
-            <HeroScheduleSkeleton />
-          ) : (
-            <>
-              <View style={styles.countdownHeader}>
-                <View>
-                  <Text style={styles.countdownLabel}>Sholat berikutnya</Text>
-                  <Text style={styles.nextPrayerName}>{schedule.nextPrayerName}</Text>
-                </View>
-                <PulseDot isActive={isUrgentCountdown} />
-              </View>
-
-              <Text style={styles.digitalCountdown}>{countdownInfo.text}</Text>
-              <Text style={styles.nextPrayerTime}>Masuk pukul {schedule.nextPrayerTime}</Text>
-
-              <View style={styles.prayerProgressTrack}>
-                <View style={[styles.prayerProgressFill, { width: `${prayerProgressPercentage}%` }]} />
-              </View>
-            </>
-          )}
-        </View>
-
-        <View style={styles.streakSection}>
-          <View style={styles.streakSummary}>
-            <Text style={styles.streakIcon}>🔥</Text>
-            <View>
-              <Text style={styles.streakNumber}>{streak}</Text>
-              <Text style={styles.streakLabel}>hari beruntun</Text>
-            </View>
-          </View>
-          <View style={styles.weekDotsRow}>
-            {Array.from({ length: 7 }).map((_, index) => {
-              const isToday = index === 6;
-              const isComplete = index >= 7 - Math.min(streak, 7);
-
-              return (
-                <View
-                  key={index}
-                  style={[
-                    styles.weekDot,
-                    isComplete && styles.weekDotComplete,
-                    isToday && styles.weekDotToday,
-                  ]}
-                />
-              );
-            })}
-          </View>
-
-          <View style={styles.todayProgressHeader}>
-            <Text style={styles.todayProgressText}>
-              {dailyProgress.checked} dari {dailyProgress.total} sholat
-            </Text>
-            <Text style={styles.todayProgressPercent}>{Math.round(progressPercentage)}%</Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-          </View>
-        </View>
-
         {isBootstrapping ? (
-          <PrayerListSkeleton />
+          <NextPrayerSkeleton />
         ) : (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Jadwal Hari Ini</Text>
-              <Text style={styles.sectionAction}>5 waktu</Text>
-            </View>
+          <View style={styles.nextPrayerCard}>
+            <View style={styles.nextPrayerCircle} />
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.prayerHorizontalContent}>
+            <View style={styles.nextPrayerContent}>
+              <Text style={styles.nextPrayerName}>{schedule.nextPrayerName}</Text>
+              <Text style={styles.nextPrayerTime}>{nextPrayerTimeDisplay}</Text>
+
+              <View style={styles.countdownRow}>
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={18}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.countdownText}>{countdownLabel}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.reminderSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Pengingat Ibadah</Text>
+            <View style={styles.moreAction}>
+              <Text style={styles.moreActionText}>Lebih Banyak</Text>
+              <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
+            </View>
+          </View>
+
+          {isBootstrapping ? (
+            <ReminderListSkeleton />
+          ) : (
+            <View style={styles.reminderList}>
               {schedule.prayers.map((item) => (
-                <PrayerReminderCard
+                <PrayerReminderRow
                   key={item.key}
-                  prayerKey={item.key}
-                  name={item.name}
-                  time={item.time}
-                  icon={prayerIcons[item.key]}
-                  status={getPrayerStatus(item, schedule.nextPrayerName)}
+                  prayer={item}
                   isChecked={Boolean(prayerChecklist[item.name])}
+                  isNotificationEnabled={
+                    notificationSettings.isEnabled &&
+                    notificationSettings.enabledPrayers[
+                    prayerVisuals[item.key].notificationKey
+                    ]
+                  }
                   onToggle={() => void handleTogglePrayer(item.name)}
+                  onToggleNotification={() =>
+                    void handleTogglePrayerNotification(item.key)
+                  }
                 />
               ))}
-            </ScrollView>
-          </>
-        )}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       <Modal
@@ -564,7 +615,10 @@ export default function HomeScreen() {
         transparent
         animationType="slide"
         onRequestClose={() => setIsLocationPickerVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setIsLocationPickerVisible(false)} />
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setIsLocationPickerVisible(false)}
+        />
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Pilih Kota/Kabupaten</Text>
@@ -607,6 +661,15 @@ export default function HomeScreen() {
   );
 }
 
+function formatLocationLabel(city: IndonesiaCity) {
+  const sanitized = city.city
+    .replace(/^Kabupaten\s+/i, '')
+    .replace(/^Kota\s+/i, '')
+    .trim();
+
+  return `${sanitized}, Idn`;
+}
+
 function getMillisecondsUntilNextMidnight() {
   const now = new Date();
   const nextMidnight = new Date(now);
@@ -617,271 +680,207 @@ function getMillisecondsUntilNextMidnight() {
   return nextMidnight.getTime() - now.getTime();
 }
 
-function PulseDot({ isActive }: { isActive: boolean }) {
-  const scale = useRef(new Animated.Value(1)).current;
+function formatCountdownLabel(value: string) {
+  const [prefix, prayerName] = value.split(' hingga ');
 
-  useEffect(() => {
-    if (!isActive) {
-      scale.setValue(1);
-      return;
-    }
+  if (!prayerName) {
+    return value;
+  }
 
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, {
-          toValue: 1.35,
-          duration: 720,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 1,
-          duration: 720,
-          useNativeDriver: true,
-        }),
-      ])
-    );
+  return `${prefix} hingga ${prayerName.toLowerCase()}`;
+}
 
-    animation.start();
-
-    return () => {
-      animation.stop();
-    };
-  }, [isActive, scale]);
-
+function NextPrayerSkeleton() {
   return (
-    <Animated.View style={[styles.pulseDotOuter, { transform: [{ scale }] }]}>
-      <View style={styles.pulseDotInner} />
-    </Animated.View>
-  );
-}
-
-function clonePrayerIcon(prayerKey: PrayerScheduleItem['key'], color: string) {
-  const iconName: Record<PrayerScheduleItem['key'], keyof typeof MaterialCommunityIcons.glyphMap> = {
-    fajr: 'weather-sunset-up',
-    dhuhr: 'white-balance-sunny',
-    asr: 'weather-partly-cloudy',
-    maghrib: 'weather-night-partly-cloudy',
-    isha: 'moon-waning-crescent',
-  };
-
-  return <MaterialCommunityIcons name={iconName[prayerKey]} size={24} color={color} />;
-}
-
-function getCountdownInfo(schedule: ReturnType<typeof getPrayerSchedule>) {
-  const now = new Date();
-  const targetDate = createPrayerDate(schedule.nextPrayerTime24h, now);
-
-  if (targetDate <= now) {
-    targetDate.setDate(targetDate.getDate() + 1);
-  }
-
-  const totalSeconds = Math.max(Math.floor((targetDate.getTime() - now.getTime()) / 1_000), 0);
-  const hours = Math.floor(totalSeconds / 3_600);
-  const minutes = Math.floor((totalSeconds % 3_600) / 60);
-  const seconds = totalSeconds % 60;
-
-  return {
-    totalMinutes: Math.floor(totalSeconds / 60),
-    text: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
-  };
-}
-
-function getPrayerWindowProgress(prayers: PrayerScheduleItem[], nextPrayerName: string) {
-  const now = new Date();
-  const nextPrayer = prayers.find((prayer) => prayer.name === nextPrayerName) ?? prayers[0];
-  const nextIndex = prayers.findIndex((prayer) => prayer.key === nextPrayer.key);
-  const previousPrayer = prayers[nextIndex - 1] ?? prayers[prayers.length - 1];
-  const nextDate = createPrayerDate(nextPrayer.time24h, now);
-  const previousDate = createPrayerDate(previousPrayer.time24h, now);
-
-  if (nextDate <= now) {
-    nextDate.setDate(nextDate.getDate() + 1);
-  }
-
-  if (previousDate >= nextDate) {
-    previousDate.setDate(previousDate.getDate() - 1);
-  }
-
-  const totalWindow = nextDate.getTime() - previousDate.getTime();
-  const elapsed = now.getTime() - previousDate.getTime();
-
-  return Math.min(Math.max((elapsed / totalWindow) * 100, 0), 100);
-}
-
-function getPrayerStatus(item: PrayerScheduleItem, nextPrayerName: string): 'past' | 'next' | 'upcoming' {
-  const now = new Date();
-  const prayerDate = createPrayerDate(item.time24h, now);
-
-  if (item.name === nextPrayerName && prayerDate > now) {
-    return 'next';
-  }
-
-  return prayerDate < now ? 'past' : 'upcoming';
-}
-
-function createPrayerDate(time: string, baseDate: Date) {
-  const [hourRaw, minuteRaw] = time.split(':');
-  const date = new Date(baseDate);
-
-  date.setHours(Number(hourRaw) || 0, Number(minuteRaw) || 0, 0, 0);
-
-  return date;
-}
-
-function HeroScheduleSkeleton() {
-  return (
-    <View style={styles.heroSkeletonWrap}>
-      <SkeletonBox width={112} height={24} borderRadius={8} style={styles.heroSkeletonBox} />
-      <SkeletonBox width={168} height={54} borderRadius={12} style={styles.heroSkeletonBox} />
-      <SkeletonBox width={184} height={18} borderRadius={8} style={styles.heroSkeletonBox} />
+    <View style={styles.nextPrayerCard}>
+      <View style={styles.nextPrayerCircle} />
+      <View style={styles.nextPrayerContent}>
+        <SkeletonBox width={120} height={26} borderRadius={8} style={styles.skeletonOnGreen} />
+        <SkeletonBox width={160} height={58} borderRadius={12} style={styles.skeletonOnGreen} />
+        <SkeletonBox width={170} height={20} borderRadius={10} style={styles.skeletonOnGreen} />
+      </View>
     </View>
   );
 }
 
-function PrayerListSkeleton() {
+function ReminderListSkeleton() {
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.prayerHorizontalContent}>
+    <View style={styles.reminderList}>
       {Array.from({ length: 5 }).map((_, index) => (
-        <View key={index} style={styles.prayerSkeletonCard}>
-          <View style={styles.prayerSkeletonLeft}>
-            <SkeletonBox width={52} height={52} borderRadius={999} />
-            <View style={styles.prayerSkeletonText}>
-              <SkeletonBox width={90} height={16} />
-              <SkeletonBox width={56} height={14} />
+        <View key={index} style={styles.reminderItem}>
+          <View style={styles.reminderInfo}>
+            <SkeletonBox
+              width={48}
+              height={48}
+              borderRadius={999}
+              style={styles.skeletonCircle}
+            />
+            <View style={styles.skeletonReminderCopy}>
+              <SkeletonBox width={96} height={22} borderRadius={8} />
+              <SkeletonBox width={54} height={18} borderRadius={8} />
             </View>
           </View>
-          <SkeletonBox width={72} height={28} borderRadius={12} />
+          <View style={styles.reminderActions}>
+            <SkeletonBox width={28} height={28} borderRadius={10} />
+            <SkeletonBox width={34} height={34} borderRadius={999} />
+          </View>
         </View>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#E7F0DE',
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#E7F0DE',
   },
   contentContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: 8,
     paddingBottom: 100,
   },
-  fixedHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl + spacing.sm,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  headerCopy: {
-    flex: 1,
-    paddingRight: spacing.xs,
-  },
   appTitle: {
-    color: '#007322',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 28,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  greeting: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSizeLG,
-    lineHeight: typography.fontSizeLG * typography.lineHeightTight,
-    fontWeight: typography.fontWeightExtraBold,
-  },
-  hijriDate: {
-    color: colors.accent,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    color: colors.primary,
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: typography.fontWeightBold,
-    marginTop: spacing.xs,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  topSection: {
+    paddingHorizontal: spacing.lg,
   },
   overviewRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 22,
-    gap: 12,
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-  overviewMain: {
+  dateColumn: {
     flex: 1,
+    paddingTop: 6,
   },
-  dateTitle: {
-    color: '#ECF7EE',
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightMedium,
-    marginTop: spacing.xs,
+  gregorianDate: {
+    color: 'black',
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: typography.fontWeightExtraBold,
   },
-  locationRow: {
+  hijriDate: {
+    color: '#5E636A',
+    fontSize: 16,
+    lineHeight: 28,
+    fontWeight: typography.fontWeightRegular,
+    marginTop: 4,
+  },
+  locationChip: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#008C3A',
+    gap: 6,
+    backgroundColor: '#00813A',
     borderRadius: 20,
-    gap: 4,
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: spacing.sm,
     maxWidth: '100%',
   },
   locationText: {
     color: '#FFFFFF',
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightBold,
-    maxWidth: 128,
+    fontSize: 16,
+    lineHeight: 28,
+    fontWeight: typography.fontWeightMedium,
+    maxWidth: 130,
   },
-  locationChip: {
+  streakCard: {
+    width: 152,
+    alignItems: 'stretch',
+  },
+  streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    maxWidth: 178,
-    borderRadius: radius.full,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.sm + 2,
-    paddingVertical: spacing.xs + 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    gap: 8,
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
-  },
-  locationIconWrap: {
-    width: 20,
-    height: 20,
+    borderColor: '#FFEDD5',
     borderRadius: radius.full,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    ...shadows.sm,
+  },
+  streakEmoji: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  streakPillText: {
+    color: '#C2410C',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: typography.fontWeightBold,
+  },
+  streakDotsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  streakDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: '#47AC5E',
+    backgroundColor: 'transparent',
+  },
+  streakDotComplete: {
+    backgroundColor: '#00813A',
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+  },
+  progressLabel: {
+    color: '#000000',
+    fontSize: 10,
+    lineHeight: 20,
+    fontWeight: typography.fontWeightBold,
+  },
+  progressValue: {
+    color: '#000000',
+    fontSize: 10,
+    lineHeight: 20,
+    fontWeight: typography.fontWeightBold,
+  },
+  progressTrack: {
+    height: 3,
+    borderRadius: radius.full,
+    backgroundColor: '#47AC5E',
+    borderWidth: 1,
+    borderColor: '#00813A',
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
+    marginTop: 2,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: radius.full,
+    backgroundColor: '#00813A',
   },
   locationErrorCard: {
     backgroundColor: '#FFF7D6',
     borderWidth: 1,
     borderColor: '#F2D17A',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 12,
-    marginTop: -8,
-    marginBottom: 18,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
   },
   locationErrorHeader: {
     flexDirection: 'row',
@@ -893,17 +892,17 @@ const styles = StyleSheet.create({
     color: '#7A271A',
     fontSize: 15,
     lineHeight: 20,
-    fontWeight: '900',
+    fontWeight: typography.fontWeightExtraBold,
   },
   locationErrorText: {
     color: '#7A4E00',
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: '600',
+    fontWeight: typography.fontWeightSemiBold,
   },
   locationErrorButton: {
     alignSelf: 'flex-start',
-    backgroundColor: '#007322',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -912,443 +911,252 @@ const styles = StyleSheet.create({
   locationErrorButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '900',
+    lineHeight: 18,
+    fontWeight: typography.fontWeightExtraBold,
   },
-  streakPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FFEDD5',
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  streakText: {
-    color: '#C2410C',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-  },
-  heroCard: {
-    height: 190,
+  nextPrayerCard: {
+    height: 159,
+    backgroundColor: '#00813A',
     borderRadius: 24,
-    backgroundColor: '#008C3A',
     overflow: 'hidden',
-    marginBottom: 32,
-    justifyContent: 'center',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    position: 'relative',
   },
-  heroCircle: {
+  nextPrayerCircle: {
     position: 'absolute',
-    right: -50,
-    top: -18,
-    width: 215,
-    height: 215,
+    width: 164,
+    height: 164,
     borderRadius: 999,
-    backgroundColor: '#58BD64',
+    right: -20,
+    top: -50,
+    backgroundColor: '#47B35E',
   },
-  heroContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    width: '68%',
-    minHeight: 120,
+  nextPrayerContent: {
+    flex: 1,
     justifyContent: 'center',
-  },
-  heroSkeletonWrap: {
-    gap: 12,
-  },
-  heroSkeletonBox: {
-    backgroundColor: colors.surfaceSecondary,
-  },
-  countdownCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    marginTop: 0,
-    marginBottom: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.md,
-  },
-  countdownHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  countdownLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightSemiBold,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   nextPrayerName: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSizeXXL,
-    lineHeight: typography.fontSizeXXL * typography.lineHeightTight,
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: typography.fontWeightExtraBold,
-    marginTop: spacing.xs,
-  },
-  pulseDotOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.full,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pulseDotInner: {
-    width: 9,
-    height: 9,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-  },
-  digitalCountdown: {
-    color: colors.primary,
-    fontSize: 34,
-    lineHeight: 40,
-    fontWeight: typography.fontWeightExtraBold,
-    letterSpacing: 0,
-    marginTop: spacing.lg,
   },
   nextPrayerTime: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightMedium,
-    marginTop: spacing.xs,
-  },
-  prayerProgressTrack: {
-    height: 5,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceSecondary,
-    overflow: 'hidden',
-    marginTop: spacing.lg,
-  },
-  prayerProgressFill: {
-    height: '100%',
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-  },
-  heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 24,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  heroTime: {
     color: '#FFFFFF',
     fontSize: 52,
     lineHeight: 56,
-    fontWeight: '800',
-    marginBottom: 10,
+    fontWeight: typography.fontWeightExtraBold,
+    marginTop: spacing.xs,
   },
   countdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
   countdownText: {
     color: '#FFFFFF',
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: typography.fontWeightRegular,
+  },
+  reminderSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: 30,
   },
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
+    color: '#000000',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: typography.fontWeightBold,
+  },
+  moreAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  moreActionText: {
+    color: colors.primary,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: typography.fontWeightRegular,
+  },
+  reminderList: {
+    gap: 12,
+  },
+  reminderItem: {
+    minHeight: 80,
+    backgroundColor: '#47AC5E',
+    borderColor: "#00813A",
+    borderWidth: 2,
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reminderItemChecked: {
+    backgroundColor: '#00813A',
+    borderWidth: 2,
+    borderColor: '#00813A',
+  },
+  reminderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  reminderIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: '#00813A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderCopy: {
+    flex: 1,
+  },
+  reminderPrayerName: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: typography.fontWeightBold,
+  },
+  reminderPrayerTime: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: typography.fontWeightRegular,
+    marginTop: 2,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: spacing.sm,
+  },
+  notificationButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  notificationButtonActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  reminderCheckButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderCheckButtonChecked: {
+    backgroundColor: '#00813A',
+    borderColor: '#00813A',
+  },
+  skeletonOnGreen: {
+    backgroundColor: 'rgba(255,255,255,0.26)',
+  },
+  skeletonCircle: {
+    backgroundColor: 'rgba(255,255,255,0.26)',
+  },
+  skeletonReminderCopy: {
+    gap: 8,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 18, 0.35)',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    maxHeight: '72%',
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 5,
+    borderRadius: radius.full,
+    backgroundColor: '#C7D2C9',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
     color: colors.textPrimary,
     fontSize: typography.fontSizeLG,
     lineHeight: typography.fontSizeLG * typography.lineHeightTight,
     fontWeight: typography.fontWeightExtraBold,
+    marginBottom: spacing.md,
   },
-  sectionAction: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightBold,
-  },
-  moreWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  moreText: {
-    color: '#007322',
-    fontSize: 16,
-  },
-  progressWrap: {
-    marginTop: -8,
-    marginBottom: 16,
-  },
-  progressText: {
-    color: '#2F3334',
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: radius.full,
+  searchInput: {
+    minHeight: 48,
+    borderRadius: 16,
     backgroundColor: colors.surfaceSecondary,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-  },
-  listWrap: {
-    gap: spacing.md,
-  },
-  streakSection: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  streakSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  streakIcon: {
-    fontSize: 30,
-    lineHeight: 36,
-  },
-  streakNumber: {
-    color: colors.textPrimary,
-    fontSize: 34,
-    lineHeight: 38,
-    fontWeight: typography.fontWeightExtraBold,
-  },
-  streakLabel: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightSemiBold,
-  },
-  weekDotsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  weekDot: {
-    width: 11,
-    height: 11,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceSecondary,
-  },
-  weekDotComplete: {
-    backgroundColor: colors.primary,
-  },
-  weekDotToday: {
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  todayProgressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  todayProgressText: {
+    paddingHorizontal: spacing.md,
     color: colors.textPrimary,
     fontSize: typography.fontSizeMD,
     lineHeight: typography.fontSizeMD * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightBold,
-  },
-  todayProgressPercent: {
-    color: colors.primary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightExtraBold,
-  },
-  prayerHorizontalContent: {
-    gap: spacing.md,
-    paddingRight: spacing.lg,
-    paddingBottom: spacing.xs,
-  },
-  prayerSkeletonCard: {
-    minHeight: 142,
-    width: 126,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prayerSkeletonLeft: {
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  prayerSkeletonText: {
-    gap: spacing.sm,
-    alignItems: 'center',
-  },
-  prayerCard: {
-    width: 126,
-    minHeight: 154,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  prayerCardActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    ...shadows.lg,
-  },
-  prayerCardPast: {
-    opacity: 0.5,
-  },
-  prayerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  prayerIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prayerIconWrapActive: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  prayerTextBlock: {
-    justifyContent: 'center',
-    gap: 5,
-  },
-  prayerName: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSizeMD,
-    lineHeight: typography.fontSizeMD * typography.lineHeightTight,
-    fontWeight: typography.fontWeightExtraBold,
-    textAlign: 'center',
-  },
-  prayerArabicName: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightBold,
-    textAlign: 'center',
-  },
-  prayerTime: {
-    color: colors.primary,
-    fontSize: typography.fontSizeXL,
-    lineHeight: typography.fontSizeXL * typography.lineHeightTight,
-    fontWeight: typography.fontWeightExtraBold,
-    textAlign: 'center',
-  },
-  prayerCardTextActive: {
-    color: '#FFFFFF',
-  },
-  prayerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  checkButton: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkButtonActiveCard: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
-  checkButtonChecked: {
-    backgroundColor: colors.primaryLight,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
-  },
-  modalSheet: {
-    backgroundColor: '#F4F8EF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 28,
-    maxHeight: '72%',
-  },
-  modalHandle: {
-    width: 48,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: '#C7D0BE',
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    color: '#1D2A21',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 12,
-  },
-  searchInput: {
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: '#E3ECD9',
-    paddingHorizontal: 14,
-    color: '#1D2A21',
-    fontSize: 16,
-    marginBottom: 12,
+    fontWeight: typography.fontWeightMedium,
+    marginBottom: spacing.md,
   },
   cityList: {
-    gap: 10,
-    paddingBottom: 16,
+    paddingBottom: spacing.md,
   },
   cityItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: '#E7ECE7',
+    marginBottom: spacing.sm,
   },
   cityItemSelected: {
-    borderWidth: 1,
-    borderColor: '#B9D8BD',
-    backgroundColor: '#EDF7EE',
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryLight,
   },
   cityItemTextWrap: {
     flex: 1,
-    paddingRight: 12,
+    paddingRight: spacing.md,
   },
   cityItemName: {
-    color: '#1D2A21',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
+    color: colors.textPrimary,
+    fontSize: typography.fontSizeMD,
+    lineHeight: typography.fontSizeMD * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightExtraBold,
   },
   cityItemProvince: {
-    color: '#5E636A',
-    fontSize: 14,
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightMedium,
+    marginTop: 2,
   },
 });

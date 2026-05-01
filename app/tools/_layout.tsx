@@ -15,7 +15,6 @@ export default function ToolsStackLayout() {
         statusBarTranslucent: false,
         headerShadowVisible: false,
       }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="quran/index" options={{ title: 'Al-Quran' }} />
       <Stack.Screen name="quran/[surahId]" options={{ title: 'Baca Surat' }} />
       <Stack.Screen name="qibla" options={{ title: 'Kiblat' }} />

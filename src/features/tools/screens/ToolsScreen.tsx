@@ -1,9 +1,7 @@
 import {
   FontAwesome6,
   MaterialCommunityIcons,
-  MaterialIcons,
 } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useRef } from 'react';
 import {
@@ -25,39 +23,45 @@ const toolCards = [
     description: 'Baca dan cari ayat',
     route: '/tools/quran',
     iconBackground: '#2F80ED',
-    icon: <MaterialCommunityIcons name="book-open-page-variant-outline" size={38} color="#FFFFFF" />,
+    icon: (
+      <MaterialCommunityIcons
+        name="book-open-page-variant-outline"
+        size={46}
+        color="#FFFFFF"
+      />
+    ),
   },
   {
     key: 'ai',
     title: 'Tanya AI',
-    description: 'Panduan ibadah ringan',
+    description: 'Panduan ibadah',
     route: '/tools/ai',
     iconBackground: '#7C3AED',
-    icon: <MaterialCommunityIcons name="robot-outline" size={38} color="#FFFFFF" />,
+    icon: <MaterialCommunityIcons name="robot-outline" size={44} color="#FFFFFF" />,
   },
   {
     key: 'kiblat',
     title: 'Kiblat',
     description: 'Arah Ka’bah real-time',
     route: '/tools/qibla',
-    iconBackground: colors.primary,
-    icon: <MaterialCommunityIcons name="compass-outline" size={40} color="#FFFFFF" />,
+    iconBackground: '#EDB12F',
+    icon: <MaterialCommunityIcons name="compass-outline" size={46} color="#FFFFFF" />,
   },
   {
     key: 'zakat',
     title: 'Zakat',
-    description: 'Kalkulator lokal',
+    description: 'Kalkulator zakat',
     route: '/tools/zakat',
-    iconBackground: colors.accent,
-    icon: <FontAwesome6 name="hand-holding-dollar" size={34} color="#FFFFFF" />,
+    iconBackground: '#2DDE7D',
+    icon: <FontAwesome6 name="hand-holding-dollar" size={40} color="#FFFFFF" />,
   },
   {
     key: 'calendar',
     title: 'Kalender Islam',
     description: 'Hari besar Hijriah',
     route: '/tools/calendar',
-    iconBackground: '#E86A33',
-    icon: <MaterialCommunityIcons name="calendar-star-outline" size={38} color="#FFFFFF" />,
+    iconBackground: '#ED582F',
+    icon: <MaterialCommunityIcons name="calendar-month-outline" size={44} color="#FFFFFF" />,
   },
 ] as const;
 
@@ -80,8 +84,8 @@ function ToolCard({
     Animated.spring(scale, {
       toValue: value,
       useNativeDriver: true,
-      speed: 28,
-      bounciness: 7,
+      speed: 24,
+      bounciness: 6,
     }).start();
   }
 
@@ -93,14 +97,8 @@ function ToolCard({
       onPressOut={() => animateScale(1)}>
       <Animated.View style={[styles.toolCard, { transform: [{ scale }] }]}>
         <View style={[styles.toolIconWrap, { backgroundColor: iconBackground }]}>{icon}</View>
-        <View style={styles.toolTextWrap}>
-          <Text style={styles.toolTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.toolDescription} numberOfLines={1}>
-            {description}
-          </Text>
-        </View>
+        <Text style={styles.toolTitle}>{title}</Text>
+        <Text style={styles.toolDescription}>{description}</Text>
       </Animated.View>
     </Pressable>
   );
@@ -113,29 +111,31 @@ export default function ToolsScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Alat Bantu</Text>
-          <Text style={styles.headerSubtitle}>Lengkapi ibadahmu</Text>
-        </View>
+        <Text style={styles.appTitle}>Waqtuna</Text>
 
-        <Pressable onPress={() => router.push('/tools/mosque')}>
-          <LinearGradient
-            colors={[colors.primary, colors.primaryDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.mosqueBanner}>
+        <Pressable
+          style={styles.bannerPressable}
+          onPress={() => router.push('/tools/mosque')}>
+          <View style={styles.mosqueBanner}>
             <View style={styles.mosqueIconWrap}>
-              <MaterialCommunityIcons name="mosque" size={42} color="#FFFFFF" />
+              <MaterialCommunityIcons name="mosque-outline" size={46} color="#FFFFFF" />
             </View>
-            <View style={styles.mosqueCopy}>
-              <Text style={styles.mosqueTitle}>Masjid Terdekat</Text>
-              <Text style={styles.mosqueSubtitle}>Temukan masjid dari posisimu sekarang</Text>
-            </View>
+
+            <Text style={styles.mosqueTitle}>Masjid Terdekat</Text>
+            <Text style={styles.mosqueSubtitle}>
+              Temukan Masjid Dari Posisimu Sekarang
+            </Text>
+
             <View style={styles.mosqueButton}>
               <Text style={styles.mosqueButtonText}>Cari Sekarang</Text>
-              <MaterialIcons name="arrow-forward" size={17} color={colors.primary} />
+              <MaterialCommunityIcons
+                name="send-outline"
+                size={22}
+                color={colors.primary}
+                style={styles.mosqueButtonIcon}
+              />
             </View>
-          </LinearGradient>
+          </View>
         </Pressable>
 
         <View style={styles.toolsGrid}>
@@ -158,129 +158,118 @@ export default function ToolsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#E7F0DE',
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#E7F0DE',
   },
   contentContainer: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: 100,
+    paddingTop: 8,
+    paddingBottom: 120,
   },
-  header: {
+  appTitle: {
+    color: colors.primary,
+    fontSize: typography.fontSizeXL,
+    lineHeight: 28,
+    fontWeight: typography.fontWeightBold,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  bannerPressable: {
     marginBottom: spacing.xl,
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSizeXXXL,
-    lineHeight: typography.fontSizeXXXL * typography.lineHeightTight,
-    fontWeight: typography.fontWeightExtraBold,
-  },
-  headerSubtitle: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeMD,
-    lineHeight: typography.fontSizeMD * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightMedium,
-    marginTop: spacing.xs,
   },
   mosqueBanner: {
-    minHeight: 154,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-    overflow: 'hidden',
+    backgroundColor: '#00813A',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     ...shadows.md,
   },
   mosqueIconWrap: {
-    width: 62,
-    height: 62,
+    width: 70,
+    height: 70,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: '#47AC5E',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-  mosqueCopy: {
-    paddingRight: spacing.md,
-  },
   mosqueTitle: {
     color: '#FFFFFF',
-    fontSize: typography.fontSizeXL,
-    lineHeight: typography.fontSizeXL * typography.lineHeightTight,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: typography.fontWeightExtraBold,
   },
   mosqueSubtitle: {
-    color: '#DDF4E4',
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightMedium,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: typography.fontWeightBold,
     marginTop: spacing.xs,
   },
   mosqueButton: {
     alignSelf: 'flex-start',
-    minHeight: 38,
+    minHeight: 50,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
+    paddingLeft: 14,
+    paddingRight: 10,
     gap: spacing.xs,
-    paddingHorizontal: spacing.md,
     marginTop: spacing.lg,
   },
   mosqueButtonText: {
-    color: colors.primary,
-    fontSize: typography.fontSizeSM,
-    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    color: '#00813A',
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: typography.fontWeightExtraBold,
+  },
+  mosqueButtonIcon: {
+    transform: [{ rotate: '-20deg' }],
   },
   toolsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: spacing.md,
+    rowGap: 12,
   },
   toolCardPressable: {
-    width: '48%',
-    aspectRatio: 1,
+    width: '48.5%',
   },
   toolCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 186,
+    backgroundColor: '#00813A',
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 28,
     ...shadows.sm,
   },
   toolIconWrap: {
-    width: 66,
-    height: 66,
+    width: 80,
+    height: 80,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  toolTextWrap: {
-    width: '100%',
-    alignItems: 'center',
+    marginBottom: 14,
   },
   toolTitle: {
-    color: colors.textPrimary,
-    fontSize: typography.fontSizeMD,
-    lineHeight: typography.fontSizeMD * typography.lineHeightTight,
+    color: '#FFFFFF',
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: typography.fontWeightExtraBold,
     textAlign: 'center',
   },
   toolDescription: {
-    color: colors.textSecondary,
-    fontSize: typography.fontSizeXS,
-    lineHeight: typography.fontSizeXS * typography.lineHeightNormal,
-    fontWeight: typography.fontWeightMedium,
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: typography.fontWeightBold,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: 8,
   },
 });

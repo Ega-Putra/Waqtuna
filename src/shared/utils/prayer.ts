@@ -50,7 +50,7 @@ export function getPrayerSchedule(
     createPrayerItem('isha', 'Isya', prayerTimes.isha, preferences?.clockFormat),
   ];
 
-  const nextPrayer = resolveNextPrayer(prayerTimes, coordinates, date, params);
+  const nextPrayer = resolveNextPrayer(prayers, coordinates, date, preferences);
 
   return {
     prayers,
@@ -96,62 +96,40 @@ function createPrayerItem(
 }
 
 function resolveNextPrayer(
-  prayerTimes: PrayerTimes,
+  prayers: PrayerScheduleItem[],
   coordinates: { latitude: number; longitude: number },
   date: Date,
-  params: ReturnType<typeof CalculationMethod.Singapore>
+  preferences: PrayerSchedulePreferences | undefined
 ) {
-  const nextPrayer = prayerTimes.nextPrayer(date);
+  const nextPrayer = prayers.find((prayer) => {
+    const prayerDate = createPrayerDate(prayer.time24h, date);
+    return prayerDate > date;
+  });
 
-  if (nextPrayer !== 'none') {
+  if (nextPrayer) {
     return {
-      key: normalizePrayerKey(nextPrayer),
-      time: getPrayerDate(prayerTimes, normalizePrayerKey(nextPrayer)),
+      key: nextPrayer.key,
+      time: createPrayerDate(nextPrayer.time24h, date),
     };
   }
+
+  const tomorrowParams = getCalculationParameters(preferences?.calculationMethod);
+  tomorrowParams.madhab =
+    preferences?.asrMadhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi;
 
   const tomorrowPrayerTimes = new PrayerTimes(
     new Coordinates(coordinates.latitude, coordinates.longitude),
     dayjs(date).add(1, 'day').toDate(),
-    params
+    tomorrowParams
   );
 
   return {
     key: 'fajr' as const,
-    time: tomorrowPrayerTimes.fajr,
+    time: createPrayerDate(
+      formatPrayerTime(tomorrowPrayerTimes.fajr, '24h'),
+      dayjs(date).add(1, 'day').toDate()
+    ),
   };
-}
-
-function normalizePrayerKey(prayer: string) {
-  switch (prayer) {
-    case 'fajr':
-      return 'fajr' as const;
-    case 'dhuhr':
-      return 'dhuhr' as const;
-    case 'asr':
-      return 'asr' as const;
-    case 'maghrib':
-      return 'maghrib' as const;
-    case 'isha':
-      return 'isha' as const;
-    default:
-      return 'fajr' as const;
-  }
-}
-
-function getPrayerDate(prayerTimes: PrayerTimes, prayer: PrayerScheduleItem['key']) {
-  switch (prayer) {
-    case 'fajr':
-      return prayerTimes.fajr;
-    case 'dhuhr':
-      return prayerTimes.dhuhr;
-    case 'asr':
-      return prayerTimes.asr;
-    case 'maghrib':
-      return prayerTimes.maghrib;
-    case 'isha':
-      return prayerTimes.isha;
-  }
 }
 
 function getPrayerDisplayName(prayer: PrayerScheduleItem['key']) {
@@ -195,4 +173,15 @@ function formatCountdown(targetDate: Date, now: Date, prayerName: string) {
   }
 
   return `${hours}j ${minutes}m hingga ${prayerName}`;
+}
+
+function createPrayerDate(time: string, baseDate: Date) {
+  const [hourRaw, minuteRaw] = time.split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  const date = new Date(baseDate);
+
+  date.setHours(Number.isFinite(hour) ? hour : 0, Number.isFinite(minute) ? minute : 0, 0, 0);
+
+  return date;
 }

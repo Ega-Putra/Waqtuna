@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -16,10 +17,16 @@ export function usePrayerNotificationSettings() {
   );
   const [isLoading, setIsLoading] = useState(true);
 
+  const loadSettings = useCallback(async () => {
+    const storedSettings = await getPrayerNotificationSettings();
+    setSettings(storedSettings);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
-    async function loadSettings() {
+    async function loadInitialSettings() {
       try {
         const storedSettings = await getPrayerNotificationSettings();
 
@@ -33,12 +40,18 @@ export function usePrayerNotificationSettings() {
       }
     }
 
-    void loadSettings();
+    void loadInitialSettings();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSettings();
+    }, [loadSettings])
+  );
 
   const persistSettings = useCallback(async (nextSettings: PrayerNotificationSettings) => {
     setSettings(nextSettings);
@@ -58,6 +71,16 @@ export function usePrayerNotificationSettings() {
     [persistSettings, settings]
   );
 
+  const setNotificationsEnabled = useCallback(
+    async (isEnabled: boolean) => {
+      await persistSettings({
+        ...settings,
+        isEnabled,
+      });
+    },
+    [persistSettings, settings]
+  );
+
   const setReminderMinutes = useCallback(
     async (minutes: number) => {
       await persistSettings({
@@ -72,10 +95,11 @@ export function usePrayerNotificationSettings() {
     () => ({
       settings,
       isLoading,
+      setNotificationsEnabled,
       setPrayerEnabled,
       setReminderMinutes,
     }),
-    [isLoading, setPrayerEnabled, setReminderMinutes, settings]
+    [isLoading, setNotificationsEnabled, setPrayerEnabled, setReminderMinutes, settings]
   );
 }
 

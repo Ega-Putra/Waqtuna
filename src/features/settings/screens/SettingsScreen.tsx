@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -16,17 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
-import {
-  defaultIndonesiaCity,
-  findCityByCode,
-  getLocationLabel,
-  persistSelectedCityCode,
-  searchIndonesiaCities,
-} from '@/shared/utils/location';
-import { getPrayerSchedule } from '@/shared/utils/prayer';
 import { rescheduleAll, type PrayerNotificationKey } from '@/services/NotificationService';
-import { PuasaReminderService } from '@/services/PuasaReminderService';
 import {
   defaultAppPreferences,
   defaultFastingReminderSettings,
@@ -43,7 +34,17 @@ import {
   type CalculationMethodPreference,
   type FastingReminderSettings,
 } from '@/services/PreferenceService';
+import { PuasaReminderService } from '@/services/PuasaReminderService';
 import { Toast } from '@/shared/components/ui/Toast';
+import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
+import {
+  defaultIndonesiaCity,
+  findCityByCode,
+  getLocationLabel,
+  persistSelectedCityCode,
+  searchIndonesiaCities,
+} from '@/shared/utils/location';
+import { getPrayerSchedule } from '@/shared/utils/prayer';
 
 const reminderOptions = [5, 10, 15, 30];
 const quranFontOptions = [26, 30, 34, 38, 42] as const;
@@ -83,10 +84,31 @@ export default function SettingsScreen() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
 
+  const loadPreferences = useCallback(async () => {
+    const [
+      storedPreferences,
+      storedNotificationSettings,
+      storedFastingReminderSettings,
+      selectedCityCode,
+    ] = await Promise.all([
+      getAppPreferences(),
+      getPrayerNotificationSettings(),
+      getFastingReminderSettings(),
+      getSelectedCityCode(),
+    ]);
+
+    setPreferences(storedPreferences);
+    setNotificationSettings(storedNotificationSettings);
+    setFastingReminderSettingsState(storedFastingReminderSettings);
+    setSelectedCity(
+      selectedCityCode ? findCityByCode(selectedCityCode) ?? defaultIndonesiaCity : defaultIndonesiaCity
+    );
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
-    async function loadPreferences() {
+    async function loadInitialPreferences() {
       const [
         storedPreferences,
         storedNotificationSettings,
@@ -109,12 +131,18 @@ export default function SettingsScreen() {
       setSelectedCity(selectedCityCode ? findCityByCode(selectedCityCode) ?? defaultIndonesiaCity : defaultIndonesiaCity);
     }
 
-    void loadPreferences();
+    void loadInitialPreferences();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadPreferences();
+    }, [loadPreferences])
+  );
 
   const filteredCities = useMemo(() => searchIndonesiaCities(cityQuery), [cityQuery]);
 

@@ -362,6 +362,7 @@ export default function SettingsScreen() {
       <Toast
         message={toastMessage}
         visible={isToastVisible}
+        bottomOffset={tabBarHeight}
         onHide={() => {
           setIsToastVisible(false);
           setToastMessage(null);

@@ -7,9 +7,16 @@ type ToastProps = {
   visible: boolean;
   onHide?: () => void;
   durationMs?: number;
+  bottomOffset?: number;
 };
 
-export function Toast({ message, visible, onHide, durationMs = 2500 }: ToastProps) {
+export function Toast({
+  message,
+  visible,
+  onHide,
+  durationMs = 2500,
+  bottomOffset = 0,
+}: ToastProps) {
   const insets = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(24)).current;
@@ -65,7 +72,7 @@ export function Toast({ message, visible, onHide, durationMs = 2500 }: ToastProp
         style={[
           styles.container,
           {
-            bottom: insets.bottom + 20,
+            bottom: insets.bottom + bottomOffset + 20,
             opacity,
             transform: [{ translateY }],
           },

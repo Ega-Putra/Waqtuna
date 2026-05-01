@@ -23,6 +23,7 @@ export type AppPreferences = {
   clockFormat: ClockFormat;
   calculationMethod: CalculationMethodPreference;
   asrMadhab: AsrMadhabPreference;
+  quranArabicFontSize: 26 | 30 | 34 | 38 | 42;
 };
 
 export type FastingReminderSettings = {
@@ -46,6 +47,7 @@ export const defaultAppPreferences: AppPreferences = {
   clockFormat: '24h',
   calculationMethod: 'kemenag',
   asrMadhab: 'shafi',
+  quranArabicFontSize: 34,
 };
 
 export const defaultFastingReminderSettings: FastingReminderSettings = {
@@ -171,6 +173,9 @@ function parseAppPreferences(rawValue: string | null): AppPreferences {
       asrMadhab: isAsrMadhab(parsed.asrMadhab)
         ? parsed.asrMadhab
         : defaultAppPreferences.asrMadhab,
+      quranArabicFontSize: isQuranArabicFontSize(parsed.quranArabicFontSize)
+        ? parsed.quranArabicFontSize
+        : defaultAppPreferences.quranArabicFontSize,
     };
   } catch {
     return defaultAppPreferences;
@@ -262,4 +267,10 @@ function isCalculationMethod(value: unknown): value is CalculationMethodPreferen
 
 function isAsrMadhab(value: unknown): value is AsrMadhabPreference {
   return value === 'shafi' || value === 'hanafi';
+}
+
+function isQuranArabicFontSize(
+  value: unknown
+): value is AppPreferences['quranArabicFontSize'] {
+  return value === 26 || value === 30 || value === 34 || value === 38 || value === 42;
 }

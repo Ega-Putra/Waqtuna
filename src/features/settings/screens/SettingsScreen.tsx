@@ -46,6 +46,7 @@ import {
 import { Toast } from '@/shared/components/ui/Toast';
 
 const reminderOptions = [5, 10, 15, 30];
+const quranFontOptions = [26, 30, 34, 38, 42] as const;
 
 const prayerOptions: { key: PrayerNotificationKey; label: string }[] = [
   { key: 'subuh', label: 'Subuh' },
@@ -195,6 +196,28 @@ export default function SettingsScreen() {
               value={preferences.clockFormat}
               onChange={(clockFormat) => void persistPreferences({ ...preferences, clockFormat })}
             />
+          </View>
+
+          <View style={styles.optionBlock}>
+            <Text style={styles.settingTitle}>Ukuran Font Arab</Text>
+            <Text style={styles.settingDescription}>
+              Atur ukuran tulisan Arab di fitur baca surat
+            </Text>
+            <View style={styles.optionGrid}>
+              {quranFontOptions.map((size) => (
+                <OptionButton
+                  key={size}
+                  label={`${size}`}
+                  isSelected={preferences.quranArabicFontSize === size}
+                  onPress={() =>
+                    void persistPreferences({
+                      ...preferences,
+                      quranArabicFontSize: size,
+                    })
+                  }
+                />
+              ))}
+            </View>
           </View>
         </Section>
 

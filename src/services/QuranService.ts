@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createHafs } from 'quran-meta';
 
 import type { Juz, QuranCacheNotice, SearchResult, Surah, SurahDetail } from '@/shared/types/quran';
 
@@ -6,6 +7,8 @@ const baseUrl = 'https://api.quran.com/api/v4';
 const cacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 const surahListCacheKey = 'quran:surah_list';
 const juzListCacheKey = 'quran:juz_list';
+const surahDetailCacheKeyVersion = 'quran:surah:v2';
+const hafsMeta = createHafs();
 
 let lastCacheNotice: QuranCacheNotice | null = null;
 
@@ -19,6 +22,10 @@ type QuranChapterResponse = {
     id: number;
     name_arabic: string;
     name_simple: string;
+    translated_name?: {
+      name?: string;
+      language_name?: string;
+    };
     verses_count: number;
     revelation_place: string;
   }[];
@@ -72,8 +79,16 @@ export const QuranService = {
   },
 
   async getSurah(surahId: number): Promise<SurahDetail> {
-    const cacheKey = `quran:surah:${surahId}`;
-    const url = `${baseUrl}/verses/by_chapter/${surahId}?language=id&words=true&translations=33&per_page=286`;
+    const cacheKey = `${surahDetailCacheKeyVersion}:${surahId}`;
+    const url =
+      `${baseUrl}/verses/by_chapter/${surahId}` +
+      '?language=id' +
+      '&words=true' +
+      '&translations=33' +
+      '&per_page=300' +
+      '&fields=text_uthmani,verse_key,verse_number,juz_number' +
+      '&word_fields=text_uthmani' +
+      '&translation_fields=text';
 
     return getCachedOrFetch<QuranVersesResponse, SurahDetail>(cacheKey, url, (response) =>
       mapSurahDetail(surahId, response)
@@ -181,6 +196,7 @@ function mapSurahList(response: QuranChapterResponse): Surah[] {
     id: chapter.id,
     nameArabic: chapter.name_arabic,
     nameSimple: chapter.name_simple,
+    translatedName: stripHtml(chapter.translated_name?.name ?? ''),
     versesCount: chapter.verses_count,
     revelationPlace: chapter.revelation_place,
   }));
@@ -208,21 +224,26 @@ function mapWordsToArabicText(words: NonNullable<QuranVersesResponse['verses']>[
 }
 
 function mapJuzList(response: QuranJuzResponse): Juz[] {
-  return (response.juzs ?? []).map((juz) => {
-    const entries = Object.entries(juz.verse_mapping);
-    const [firstSurahIdRaw, firstRange = '1-1'] = entries[0] ?? ['1', '1-1'];
-    const [lastSurahIdRaw, lastRange = '1-1'] = entries[entries.length - 1] ?? ['1', '1-1'];
-    const [firstVerseRaw] = firstRange.split('-');
-    const [, lastVerseRaw = firstVerseRaw] = lastRange.split('-');
+  const fallbackMappings = response.juzs ?? [];
+
+  return Array.from({ length: 30 }, (_, index) => {
+    const juzNumber = index + 1;
+    const juzMeta = hafsMeta.getJuzMeta(juzNumber);
+    const fallbackJuz = fallbackMappings.find((item) => item.juz_number === juzNumber);
+    const [[firstSurahId, firstVerse], [lastSurahId, lastVerse]] = [
+      juzMeta.first,
+      juzMeta.last,
+    ];
 
     return {
-      id: juz.id,
-      juzNumber: juz.juz_number,
-      verseMapping: juz.verse_mapping,
-      firstSurahId: Number(firstSurahIdRaw),
-      firstVerse: Number(firstVerseRaw),
-      lastSurahId: Number(lastSurahIdRaw),
-      lastVerse: Number(lastVerseRaw),
+      id: fallbackJuz?.id ?? juzNumber,
+      juzNumber,
+      verseMapping: normalizeVerseMapping(fallbackJuz?.verse_mapping ?? {}),
+      firstSurahId,
+      firstVerse,
+      lastSurahId,
+      lastVerse,
+      versesCount: juzMeta.lastAyahId - juzMeta.firstAyahId + 1,
     };
   });
 }
@@ -244,4 +265,10 @@ function mapSearchResults(response: QuranSearchResponse): SearchResult[] {
 
 function stripHtml(value: string) {
   return value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeVerseMapping(value: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, range]) => [String(key), String(range)])
+  );
 }

@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,13 +13,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/shared/components/feedback/ErrorState';
 import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
+import { getAppPreferences } from '@/services/PreferenceService';
 import { QuranService } from '@/services/QuranService';
 import type { Ayah, Surah, SurahDetail } from '@/shared/types/quran';
 
 const bookmarksKey = 'quran:bookmarks';
-const arabicFontSizeKey = 'quran:arabic_font_size';
 const basmalahText = 'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ';
-const fontSizes = [26, 30, 34, 38, 42];
 
 export default function SurahReaderScreen() {
   const { surahId } = useLocalSearchParams<{ surahId: string }>();
@@ -47,19 +45,19 @@ export default function SurahReaderScreen() {
       setIsLoading(true);
       setHasRestoredScroll(false);
 
-      const [surahData, surahList, bookmarkValues, fontSizeValue, storedScrollOffset] =
+      const [surahData, surahList, bookmarkValues, appPreferences, storedScrollOffset] =
         await Promise.all([
           QuranService.getSurah(parsedSurahId),
           QuranService.getSurahList(),
           getBookmarks(),
-          AsyncStorage.getItem(arabicFontSizeKey),
+          getAppPreferences(),
           AsyncStorage.getItem(getScrollKey(parsedSurahId)),
         ]);
 
       setSurahDetail(surahData);
       setSurahs(surahList);
       setBookmarks(new Set(bookmarkValues));
-      setArabicFontSize(parseFontSize(fontSizeValue));
+      setArabicFontSize(appPreferences.quranArabicFontSize);
       setScrollOffset(Number(storedScrollOffset) || 0);
       setCacheMessage(QuranService.getCacheNotice()?.message ?? null);
     } catch {
@@ -87,11 +85,6 @@ export default function SurahReaderScreen() {
       clearTimeout(timeout);
     };
   }, [hasRestoredScroll, scrollOffset, surahDetail]);
-
-  async function handleSetArabicFontSize(size: number) {
-    setArabicFontSize(size);
-    await AsyncStorage.setItem(arabicFontSizeKey, String(size));
-  }
 
   async function toggleBookmark(ayah: Ayah) {
     const nextBookmarks = new Set(bookmarks);
@@ -122,29 +115,15 @@ export default function SurahReaderScreen() {
         onScroll={(event) => void persistScrollOffset(event.nativeEvent.contentOffset.y)}>
         <View style={styles.headerCard}>
           <Text style={styles.surahTitle}>{currentSurah?.nameSimple ?? `Surat ${parsedSurahId}`}</Text>
+          {currentSurah?.translatedName ? (
+            <Text style={styles.surahTranslation}>{currentSurah.translatedName}</Text>
+          ) : null}
           <Text style={styles.surahMeta}>
             {currentSurah ? `${currentSurah.versesCount} ayat · ${formatRevelationPlace(currentSurah.revelationPlace)}` : ''}
           </Text>
         </View>
 
         {cacheMessage ? <Text style={styles.cacheBanner}>Menampilkan data dari cache</Text> : null}
-
-        <View style={styles.fontControlCard}>
-          <Text style={styles.controlTitle}>Ukuran font Arab</Text>
-          <View style={styles.fontSlider}>
-            {fontSizes.map((size) => (
-              <Pressable
-                key={size}
-                style={[styles.fontStep, arabicFontSize === size && styles.fontStepActive]}
-                onPress={() => void handleSetArabicFontSize(size)}>
-                <Text
-                  style={[styles.fontStepText, arabicFontSize === size && styles.fontStepTextActive]}>
-                  {size}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
 
         {isLoading ? (
           <AyahSkeletonList />
@@ -165,13 +144,6 @@ export default function SurahReaderScreen() {
                 style={[styles.ayahNumber, bookmarks.has(ayah.verseKey) && styles.ayahNumberBookmarked]}
                 onPress={() => void toggleBookmark(ayah)}>
                 <Text style={styles.ayahNumberText}>{ayah.verseNumber}</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.audioButton}
-                onPress={() => void openAudio(getGlobalAyahNumber(surahs, parsedSurahId, ayah.verseNumber))}>
-                <MaterialCommunityIcons name="volume-high" size={18} color="#007322" />
-                <Text style={styles.audioText}>Audio</Text>
               </Pressable>
             </View>
 
@@ -227,28 +199,8 @@ async function getBookmarks(): Promise<string[]> {
   }
 }
 
-async function openAudio(globalAyahNumber: number) {
-  const url = `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${globalAyahNumber}.mp3`;
-
-  await Linking.openURL(url);
-}
-
-function getGlobalAyahNumber(surahs: Surah[], surahId: number, verseNumber: number) {
-  const previousAyahCount = surahs
-    .filter((surah) => surah.id < surahId)
-    .reduce((total, surah) => total + surah.versesCount, 0);
-
-  return previousAyahCount + verseNumber;
-}
-
 function getScrollKey(surahId: number) {
   return `quran:last_scroll:${surahId}`;
-}
-
-function parseFontSize(value: string | null) {
-  const size = Number(value);
-
-  return fontSizes.includes(size) ? size : 34;
 }
 
 function formatRevelationPlace(value: string) {
@@ -285,6 +237,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  surahTranslation: {
+    color: '#F6FBEF',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginTop: 3,
+  },
   cacheBanner: {
     color: '#7A4E00',
     backgroundColor: '#FFF7D6',
@@ -296,43 +255,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 13,
     lineHeight: 18,
-  },
-  fontControlCard: {
-    backgroundColor: '#F5FAEF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D7E6CB',
-    padding: 12,
-    marginBottom: 14,
-  },
-  controlTitle: {
-    color: '#1D2A21',
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  fontSlider: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  fontStep: {
-    flex: 1,
-    minHeight: 36,
-    borderRadius: 12,
-    backgroundColor: '#E3ECD9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fontStepActive: {
-    backgroundColor: '#007322',
-  },
-  fontStepText: {
-    color: '#4D5A4F',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  fontStepTextActive: {
-    color: '#FFFFFF',
   },
   ayahSkeletonWrap: {
     gap: 12,
@@ -369,9 +291,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ayahHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   ayahNumber: {
@@ -388,20 +308,6 @@ const styles = StyleSheet.create({
   ayahNumberText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '900',
-  },
-  audioButton: {
-    minHeight: 34,
-    borderRadius: 999,
-    backgroundColor: '#E3ECD9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-  },
-  audioText: {
-    color: '#007322',
-    fontSize: 12,
     fontWeight: '900',
   },
   arabicText: {

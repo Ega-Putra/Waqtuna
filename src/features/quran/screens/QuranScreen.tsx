@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router, type RelativePathString } from 'expo-router';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -16,14 +16,13 @@ import { EmptyState } from '@/shared/components/feedback/EmptyState';
 import { ErrorState } from '@/shared/components/feedback/ErrorState';
 import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
 import { QuranService } from '@/services/QuranService';
-import type { Juz, SearchResult, Surah } from '@/shared/types/quran';
+import type { Juz, Surah } from '@/shared/types/quran';
 
-type QuranTab = 'surah' | 'juz' | 'search';
+type QuranTab = 'surah' | 'juz';
 
 const tabs: { key: QuranTab; label: string }[] = [
   { key: 'surah', label: 'Surat' },
   { key: 'juz', label: 'Juz' },
-  { key: 'search', label: 'Cari' },
 ];
 
 const lastReadKey = 'quran:last_read';
@@ -33,13 +32,11 @@ export default function QuranScreen() {
   const [surahs, setSurahs] = useState<Surah[]>([]);
   const [juzs, setJuzs] = useState<Juz[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [lastReadSurahId, setLastReadSurahId] = useState<number | null>(null);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoadingSurahs, setIsLoadingSurahs] = useState(true);
   const [isLoadingJuzs, setIsLoadingJuzs] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     void loadSurahs();
@@ -47,28 +44,61 @@ export default function QuranScreen() {
     void loadLastRead();
   }, []);
 
-  useEffect(() => {
-    const trimmedQuery = searchQuery.trim();
-
-    if (!trimmedQuery) {
-      setSearchResults([]);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      void searchAyat(trimmedQuery);
-    }, 500);
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [searchQuery]);
-
   const surahById = useMemo(
     () => new Map(surahs.map((surah) => [surah.id, surah])),
     [surahs]
   );
   const lastReadSurah = lastReadSurahId ? surahById.get(lastReadSurahId) : null;
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const shouldShowSearchResults = normalizedQuery.length > 0;
+  const filteredSurahs = useMemo(
+    () =>
+      surahs.filter((surah) =>
+        [
+          surah.id,
+          surah.nameSimple,
+          surah.nameArabic,
+          surah.translatedName,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(normalizedQuery))
+      ),
+    [normalizedQuery, surahs]
+  );
+  const filteredJuzs = useMemo(
+    () =>
+      juzs.filter((juz) => {
+        const rangeLabel = formatJuzRange(juz, surahById).toLowerCase();
+
+        return (
+          String(juz.juzNumber).includes(normalizedQuery) ||
+          `juz ${juz.juzNumber}`.includes(normalizedQuery) ||
+          rangeLabel.includes(normalizedQuery)
+        );
+      }),
+    [juzs, normalizedQuery, surahById]
+  );
+  const searchEntries = useMemo(() => {
+    const seenKeys = new Set<string>();
+
+    return [
+      ...filteredSurahs.map((item) => ({ type: 'surah' as const, item })),
+      ...filteredJuzs.map((item) => ({ type: 'juz' as const, item })),
+    ].filter((entry) => {
+      const entryKey =
+        entry.type === 'surah'
+          ? `search-surah-${entry.item.id}`
+          : `search-juz-${entry.item.juzNumber}`;
+
+      if (seenKeys.has(entryKey)) {
+        return false;
+      }
+
+      seenKeys.add(entryKey);
+
+      return true;
+    });
+  }, [filteredJuzs, filteredSurahs]);
 
   async function loadSurahs() {
     try {
@@ -109,20 +139,10 @@ export default function QuranScreen() {
   async function openSurah(surahId: number) {
     await AsyncStorage.setItem(lastReadKey, String(surahId));
     setLastReadSurahId(surahId);
-    router.push(`./${surahId}` as RelativePathString);
-  }
-
-  async function searchAyat(query: string) {
-    try {
-      setIsSearching(true);
-      const data = await QuranService.searchAyat(query);
-      setSearchResults(data);
-    } catch {
-      setSearchResults([]);
-      setErrorMessage('Pencarian gagal. Periksa koneksi lalu coba lagi.');
-    } finally {
-      setIsSearching(false);
-    }
+    router.push({
+      pathname: '/tools/quran/[surahId]',
+      params: { surahId: String(surahId) },
+    });
   }
 
   return (
@@ -141,6 +161,26 @@ export default function QuranScreen() {
           ))}
         </View>
 
+        <View style={styles.searchHeader}>
+          <View style={styles.searchInputWrap}>
+            <MaterialIcons name="search" size={20} color="#66706A" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Cari ayat atau kata"
+              placeholderTextColor="#7C847D"
+              style={styles.searchInput}
+            />
+            {searchQuery ? (
+              <Pressable
+                style={styles.clearSearchButton}
+                onPress={() => setSearchQuery('')}>
+                <MaterialIcons name="close" size={18} color="#66706A" />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
         {cacheMessage ? <Text style={styles.cacheBanner}>Menampilkan data dari cache</Text> : null}
         {errorMessage ? (
           <ErrorState
@@ -152,7 +192,7 @@ export default function QuranScreen() {
           />
         ) : null}
 
-        {activeTab === 'surah' ? (
+        {activeTab === 'surah' && !shouldShowSearchResults ? (
           <FlatList
             data={isLoadingSurahs ? [] : surahs}
             keyExtractor={(item) => String(item.id)}
@@ -179,6 +219,9 @@ export default function QuranScreen() {
                 </View>
                 <View style={styles.surahTextWrap}>
                   <Text style={styles.surahName}>{item.nameSimple}</Text>
+                  {item.translatedName ? (
+                    <Text style={styles.surahTranslation}>{item.translatedName}</Text>
+                  ) : null}
                   <Text style={styles.surahMeta}>
                     {item.versesCount} ayat · {formatRevelationPlace(item.revelationPlace)}
                   </Text>
@@ -189,7 +232,7 @@ export default function QuranScreen() {
           />
         ) : null}
 
-        {activeTab === 'juz' ? (
+        {activeTab === 'juz' && !shouldShowSearchResults ? (
           <FlatList
             data={isLoadingJuzs ? [] : juzs}
             keyExtractor={(item) => String(item.id)}
@@ -208,6 +251,9 @@ export default function QuranScreen() {
                 </View>
                 <View style={styles.surahTextWrap}>
                   <Text style={styles.surahName}>Juz {item.juzNumber}</Text>
+                  {item.versesCount ? (
+                    <Text style={styles.surahTranslation}>{item.versesCount} ayat</Text>
+                  ) : null}
                   <Text style={styles.surahMeta}>{formatJuzRange(item, surahById)}</Text>
                 </View>
               </View>
@@ -215,34 +261,50 @@ export default function QuranScreen() {
           />
         ) : null}
 
-        {activeTab === 'search' ? (
+        {shouldShowSearchResults ? (
           <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.verseKey}
-            ListHeaderComponent={
-              <View style={styles.searchHeader}>
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Cari ayat atau kata"
-                  placeholderTextColor="#7C847D"
-                  style={styles.searchInput}
-                />
-                {isSearching ? <Text style={styles.searchHint}>Mencari...</Text> : null}
-              </View>
+            data={searchEntries}
+            keyExtractor={(entry) =>
+              entry.type === 'surah'
+                ? `search-surah-${entry.item.id}`
+                : `search-juz-${entry.item.juzNumber}`
             }
             ListEmptyComponent={
-              searchQuery.trim() && !isSearching ? (
-                <EmptyState title="Tidak ada hasil" subtitle="Coba kata kunci lain." />
-              ) : null
+              <EmptyState title="Tidak ada hasil" subtitle="Coba nama surat atau nomor juz lain." />
             }
             contentContainerStyle={styles.listContent}
-            renderItem={({ item }) => (
-              <View style={styles.searchCard}>
-                <Text style={styles.searchVerseKey}>{item.verseKey}</Text>
-                <HighlightedText text={item.text || item.translation || ''} query={searchQuery} />
-              </View>
-            )}
+            renderItem={({ item: entry }) =>
+              entry.type === 'surah' ? (
+                <Pressable style={styles.surahCard} onPress={() => void openSurah(entry.item.id)}>
+                  <View style={styles.numberBadge}>
+                    <Text style={styles.numberText}>{entry.item.id}</Text>
+                  </View>
+                  <View style={styles.surahTextWrap}>
+                    <Text style={styles.surahName}>{entry.item.nameSimple}</Text>
+                    {entry.item.translatedName ? (
+                      <Text style={styles.surahTranslation}>{entry.item.translatedName}</Text>
+                    ) : null}
+                    <Text style={styles.surahMeta}>
+                      {entry.item.versesCount} ayat · {formatRevelationPlace(entry.item.revelationPlace)}
+                    </Text>
+                  </View>
+                  <Text style={styles.arabicName}>{entry.item.nameArabic}</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.surahCard}>
+                  <View style={styles.numberBadge}>
+                    <Text style={styles.numberText}>{entry.item.juzNumber}</Text>
+                  </View>
+                  <View style={styles.surahTextWrap}>
+                    <Text style={styles.surahName}>Juz {entry.item.juzNumber}</Text>
+                    {entry.item.versesCount ? (
+                      <Text style={styles.surahTranslation}>{entry.item.versesCount} ayat</Text>
+                    ) : null}
+                    <Text style={styles.surahMeta}>{formatJuzRange(entry.item, surahById)}</Text>
+                  </View>
+                </View>
+              )
+            }
           />
         ) : null}
       </View>
@@ -264,29 +326,6 @@ function SkeletonList() {
         </View>
       ))}
     </View>
-  );
-}
-
-function HighlightedText({ text, query }: { text: string; query: string }) {
-  const trimmedQuery = query.trim();
-
-  if (!trimmedQuery) {
-    return <Text style={styles.searchText}>{text}</Text>;
-  }
-
-  const escapedQuery = trimmedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
-
-  return (
-    <Text style={styles.searchText}>
-      {parts.map((part, index) => (
-        <Text
-          key={`${part}-${index}`}
-          style={part.toLowerCase() === trimmedQuery.toLowerCase() ? styles.highlightText : null}>
-          {part}
-        </Text>
-      ))}
-    </Text>
   );
 }
 
@@ -408,6 +447,13 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 3,
   },
+  surahTranslation: {
+    color: '#007322',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    marginTop: 2,
+  },
   arabicName: {
     color: '#007322',
     fontSize: 23,
@@ -434,42 +480,28 @@ const styles = StyleSheet.create({
   searchHeader: {
     marginBottom: 10,
   },
-  searchInput: {
-    height: 48,
+  searchInputWrap: {
+    minHeight: 48,
     borderRadius: 14,
     backgroundColor: '#F5FAEF',
     borderWidth: 1,
     borderColor: '#D7E6CB',
-    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingLeft: 14,
+    paddingRight: 8,
+  },
+  searchInput: {
+    flex: 1,
     color: '#1D2A21',
     fontSize: 16,
   },
-  searchHint: {
-    color: '#66706A',
-    fontSize: 13,
-    marginTop: 8,
-  },
-  searchCard: {
-    borderRadius: 16,
-    backgroundColor: '#F5FAEF',
-    borderWidth: 1,
-    borderColor: '#D7E6CB',
-    padding: 12,
-  },
-  searchVerseKey: {
-    color: '#007322',
-    fontSize: 13,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
-  searchText: {
-    color: '#1D2A21',
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  highlightText: {
-    backgroundColor: '#F6D365',
-    color: '#1D2A21',
-    fontWeight: '900',
+  clearSearchButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

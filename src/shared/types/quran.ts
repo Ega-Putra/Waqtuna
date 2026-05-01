@@ -4,6 +4,7 @@ export type Surah = {
   id: number;
   nameArabic: string;
   nameSimple: string;
+  translatedName?: string;
   versesCount: number;
   revelationPlace: RevelationPlace;
 };
@@ -30,6 +31,7 @@ export type Juz = {
   firstVerse: number;
   lastSurahId: number;
   lastVerse: number;
+  versesCount?: number;
 };
 
 export type SearchResult = {

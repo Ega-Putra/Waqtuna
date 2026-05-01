@@ -143,6 +143,7 @@ export default function HomeScreen() {
     }, new Date(), {
       calculationMethod: defaultAppPreferences.calculationMethod,
       asrMadhab: defaultAppPreferences.asrMadhab,
+      clockFormat: defaultAppPreferences.clockFormat,
     })
   );
 
@@ -185,6 +186,7 @@ export default function HomeScreen() {
             {
               calculationMethod: storedPreferences.calculationMethod,
               asrMadhab: storedPreferences.asrMadhab,
+              clockFormat: storedPreferences.clockFormat,
             }
           )
         );
@@ -206,6 +208,7 @@ export default function HomeScreen() {
             {
               calculationMethod: defaultAppPreferences.calculationMethod,
               asrMadhab: defaultAppPreferences.asrMadhab,
+              clockFormat: defaultAppPreferences.clockFormat,
             }
           )
         );
@@ -251,6 +254,7 @@ export default function HomeScreen() {
               {
                 calculationMethod: nextPreferences.calculationMethod,
                 asrMadhab: nextPreferences.asrMadhab,
+                clockFormat: nextPreferences.clockFormat,
               }
             )
           );
@@ -282,6 +286,7 @@ export default function HomeScreen() {
         }, new Date(), {
           calculationMethod: preferences.calculationMethod,
           asrMadhab: preferences.asrMadhab,
+          clockFormat: preferences.clockFormat,
         })
       );
     }, 1_000);
@@ -289,7 +294,12 @@ export default function HomeScreen() {
     return () => {
       clearInterval(interval);
     };
-  }, [preferences.asrMadhab, preferences.calculationMethod, selectedCity]);
+  }, [
+    preferences.asrMadhab,
+    preferences.calculationMethod,
+    preferences.clockFormat,
+    selectedCity,
+  ]);
 
   useEffect(() => {
     let isActive = true;
@@ -335,6 +345,7 @@ export default function HomeScreen() {
       }, new Date(), {
         calculationMethod: preferences.calculationMethod,
         asrMadhab: preferences.asrMadhab,
+        clockFormat: preferences.clockFormat,
       });
 
       await rescheduleAll(currentSchedule.prayers, notificationSettings);
@@ -367,6 +378,7 @@ export default function HomeScreen() {
     notificationSettings,
     preferences.asrMadhab,
     preferences.calculationMethod,
+    preferences.clockFormat,
     selectedCity,
   ]);
 
@@ -381,6 +393,7 @@ export default function HomeScreen() {
       }, new Date(), {
         calculationMethod: preferences.calculationMethod,
         asrMadhab: preferences.asrMadhab,
+        clockFormat: preferences.clockFormat,
       })
     );
     setIsLocationPickerVisible(false);
@@ -656,7 +669,7 @@ function clonePrayerIcon(prayerKey: PrayerScheduleItem['key'], color: string) {
 
 function getCountdownInfo(schedule: ReturnType<typeof getPrayerSchedule>) {
   const now = new Date();
-  const targetDate = createPrayerDate(schedule.nextPrayerTime, now);
+  const targetDate = createPrayerDate(schedule.nextPrayerTime24h, now);
 
   if (targetDate <= now) {
     targetDate.setDate(targetDate.getDate() + 1);
@@ -678,8 +691,8 @@ function getPrayerWindowProgress(prayers: PrayerScheduleItem[], nextPrayerName: 
   const nextPrayer = prayers.find((prayer) => prayer.name === nextPrayerName) ?? prayers[0];
   const nextIndex = prayers.findIndex((prayer) => prayer.key === nextPrayer.key);
   const previousPrayer = prayers[nextIndex - 1] ?? prayers[prayers.length - 1];
-  const nextDate = createPrayerDate(nextPrayer.time, now);
-  const previousDate = createPrayerDate(previousPrayer.time, now);
+  const nextDate = createPrayerDate(nextPrayer.time24h, now);
+  const previousDate = createPrayerDate(previousPrayer.time24h, now);
 
   if (nextDate <= now) {
     nextDate.setDate(nextDate.getDate() + 1);
@@ -697,7 +710,7 @@ function getPrayerWindowProgress(prayers: PrayerScheduleItem[], nextPrayerName: 
 
 function getPrayerStatus(item: PrayerScheduleItem, nextPrayerName: string): 'past' | 'next' | 'upcoming' {
   const now = new Date();
-  const prayerDate = createPrayerDate(item.time, now);
+  const prayerDate = createPrayerDate(item.time24h, now);
 
   if (item.name === nextPrayerName && prayerDate > now) {
     return 'next';

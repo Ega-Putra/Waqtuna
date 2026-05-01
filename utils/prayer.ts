@@ -12,17 +12,21 @@ export type PrayerScheduleItem = {
   key: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
   name: string;
   time: string;
+  time24h: string;
 };
 
 export type PrayerSchedule = {
   prayers: PrayerScheduleItem[];
   nextPrayerName: string;
   nextPrayerTime: string;
+  nextPrayerTime24h: string;
   nextPrayerHeroTime: string;
   countdownText: string;
 };
 
-type PrayerSchedulePreferences = Pick<AppPreferences, 'calculationMethod' | 'asrMadhab'>;
+type PrayerSchedulePreferences = Partial<
+  Pick<AppPreferences, 'calculationMethod' | 'asrMadhab' | 'clockFormat'>
+>;
 
 export function getPrayerSchedule(
   coordinates: { latitude: number; longitude: number },
@@ -39,11 +43,11 @@ export function getPrayerSchedule(
   );
 
   const prayers: PrayerScheduleItem[] = [
-    createPrayerItem('fajr', 'Subuh', prayerTimes.fajr),
-    createPrayerItem('dhuhr', 'Dzuhur', prayerTimes.dhuhr),
-    createPrayerItem('asr', 'Ashar', prayerTimes.asr),
-    createPrayerItem('maghrib', 'Maghrib', prayerTimes.maghrib),
-    createPrayerItem('isha', 'Isya', prayerTimes.isha),
+    createPrayerItem('fajr', 'Subuh', prayerTimes.fajr, preferences?.clockFormat),
+    createPrayerItem('dhuhr', 'Dzuhur', prayerTimes.dhuhr, preferences?.clockFormat),
+    createPrayerItem('asr', 'Ashar', prayerTimes.asr, preferences?.clockFormat),
+    createPrayerItem('maghrib', 'Maghrib', prayerTimes.maghrib, preferences?.clockFormat),
+    createPrayerItem('isha', 'Isya', prayerTimes.isha, preferences?.clockFormat),
   ];
 
   const nextPrayer = resolveNextPrayer(prayerTimes, coordinates, date, params);
@@ -51,7 +55,8 @@ export function getPrayerSchedule(
   return {
     prayers,
     nextPrayerName: getPrayerDisplayName(nextPrayer.key),
-    nextPrayerTime: formatTime(nextPrayer.time),
+    nextPrayerTime: formatPrayerTime(nextPrayer.time, preferences?.clockFormat ?? '24h'),
+    nextPrayerTime24h: formatPrayerTime(nextPrayer.time, '24h'),
     nextPrayerHeroTime: formatHeroTime(nextPrayer.time),
     countdownText: formatCountdown(nextPrayer.time, date, getPrayerDisplayName(nextPrayer.key)),
   };
@@ -79,12 +84,14 @@ function getCalculationParameters(
 function createPrayerItem(
   key: PrayerScheduleItem['key'],
   name: string,
-  time: Date
+  time: Date,
+  clockFormat: AppPreferences['clockFormat'] | undefined
 ): PrayerScheduleItem {
   return {
     key,
     name,
-    time: formatTime(time),
+    time: formatPrayerTime(time, clockFormat ?? '24h'),
+    time24h: formatPrayerTime(time, '24h'),
   };
 }
 
@@ -162,12 +169,16 @@ function getPrayerDisplayName(prayer: PrayerScheduleItem['key']) {
   }
 }
 
-function formatTime(date: Date) {
+export function formatPrayerTime(date: Date, clockFormat: AppPreferences['clockFormat']) {
+  if (clockFormat === '12h') {
+    return dayjs(date).format('hh:mm A');
+  }
+
   return dayjs(date).format('HH:mm');
 }
 
 function formatHeroTime(date: Date) {
-  return formatTime(date).replace(':', '.');
+  return formatPrayerTime(date, '24h').replace(':', '.');
 }
 
 function formatCountdown(targetDate: Date, now: Date, prayerName: string) {

@@ -1,7 +1,7 @@
-import { getDailyChecklist, type PrayerChecklist } from '@/src/services/PrayerChecklistService';
-import { getSelectedCityCode } from '@/src/services/PreferenceService';
-import { defaultIndonesiaCity, findCityByCode, getLocationLabel } from '@/utils/location';
-import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
+import { getDailyChecklist, type PrayerChecklist } from '@/services/PrayerChecklistService';
+import { getSelectedCityCode } from '@/services/PreferenceService';
+import { defaultIndonesiaCity, findCityByCode, getLocationLabel } from '@/shared/utils/location';
+import { getPrayerSchedule, type PrayerScheduleItem } from '@/shared/utils/prayer';
 
 export type PrayerWidgetData = {
   cityName: string;

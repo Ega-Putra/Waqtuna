@@ -4,14 +4,14 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { getOnboardingCompleted } from '@/src/services/PreferenceService';
-import { PuasaReminderService } from '@/src/services/PuasaReminderService';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { getOnboardingCompleted } from '@/services/PreferenceService';
+import { PuasaReminderService } from '@/services/PuasaReminderService';
 import {
   updateAllHomeWidgets,
   updateDailyPrayerWidget,
   updateNextPrayerWidget,
-} from '@/src/services/WidgetUpdateService';
+} from '@/services/WidgetUpdateService';
 
 export const unstable_settings = {
   anchor: '(tabs)',

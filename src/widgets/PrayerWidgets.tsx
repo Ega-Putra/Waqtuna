@@ -6,8 +6,8 @@ import {
   getPrayerWidgetData,
   sortPrayers,
   type PrayerWidgetData,
-} from '@/src/widgets/WidgetDataService';
-import { WidgetClickActions } from '@/src/widgets/widgetConstants';
+} from '@/widgets/WidgetDataService';
+import { WidgetClickActions } from '@/widgets/widgetConstants';
 
 const colors = {
   green: '#007322',

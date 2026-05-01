@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import {
   getFastingReminderSettings,
   type FastingReminderSettings,
-} from '@/src/services/PreferenceService';
+} from '@/services/PreferenceService';
 
 const FASTING_NOTIFICATION_CHANNEL_ID = 'waqtuna-fasting-reminders';
 const fastingNotificationCategory = 'fasting-reminder';

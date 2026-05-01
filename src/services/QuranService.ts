@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Juz, QuranCacheNotice, SearchResult, Surah, SurahDetail } from '@/src/types/quran';
+import type { Juz, QuranCacheNotice, SearchResult, Surah, SurahDetail } from '@/shared/types/quran';
 
 const baseUrl = 'https://api.quran.com/api/v4';
 const cacheMaxAgeMs = 7 * 24 * 60 * 60 * 1000;

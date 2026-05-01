@@ -1,12 +1,12 @@
 import { registerWidgetTaskHandler } from 'react-native-android-widget';
 
-import { togglePrayer } from '@/src/services/PrayerChecklistService';
+import { togglePrayer } from '@/services/PrayerChecklistService';
 import {
   renderChecklistWidget,
   renderDailyPrayerWidget,
   renderNextPrayerWidget,
-} from '@/src/widgets/PrayerWidgets';
-import { WidgetClickActions, WidgetNames } from '@/src/widgets/widgetConstants';
+} from '@/widgets/PrayerWidgets';
+import { WidgetClickActions, WidgetNames } from '@/widgets/widgetConstants';
 
 registerWidgetTaskHandler(
   async ({ widgetInfo, widgetAction, clickAction, clickActionData, renderWidget }) => {

@@ -1,7 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
-import { useCallback } from 'react';
 import {
   Dimensions,
   Platform,
@@ -11,12 +10,9 @@ import {
   View,
 } from 'react-native';
 import Animated, {
-  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
-  SharedValue
 } from 'react-native-reanimated';
 
 const TABS = [
@@ -31,74 +27,6 @@ const TAB_BAR_WIDTH = SCREEN_WIDTH - TAB_BAR_HORIZONTAL_MARGIN * 2;
 const TAB_WIDTH = TAB_BAR_WIDTH / TABS.length;
 
 const SPRING = { damping: 18, stiffness: 200, mass: 0.8 };
-
-function AnimatedTabItem({
-  tab,
-  index,
-  activeIndex,
-  onPress,
-}: {
-  tab: (typeof TABS)[number];
-  index: number;
-  activeIndex: SharedValue<number>;
-  onPress: () => void;
-}) {
-  const scale = useSharedValue(1);
-
-  const handlePress = useCallback(() => {
-    scale.value = withSpring(0.88, SPRING, () => {
-      scale.value = withSpring(1, SPRING);
-    });
-    onPress();
-  }, [onPress, scale]);
-
-  const animStyle = useAnimatedStyle(() => {
-    const isActive = activeIndex.value === index;
-    const color = interpolateColor(
-      isActive ? 1 : 0,
-      [0, 1],
-      ['#8FA097', '#007322']
-    );
-    return {
-      transform: [{ scale: scale.value }],
-      opacity: withTiming(isActive ? 1 : 0.75, { duration: 180 })
-    };
-  });
-
-  const iconColorStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      activeIndex.value === index ? 1 : 0,
-      [0, 1],
-      ['#8FA097', '#007322']
-    ),
-  }));
-
-  const labelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(
-      activeIndex.value === index ? 1 : 0,
-      [0, 1],
-      ['#8FA097', '#007322']
-    ),
-    fontWeight: activeIndex.value === index ? '700' : '500',
-  }));
-
-  return (
-    <Pressable onPress={handlePress} style={styles.tabItem}>
-      <Animated.View style={[styles.tabItemInner, animStyle]}>
-        <MaterialCommunityIcons
-          // @ts-ignore
-          name={tab.icon}
-          size={22}
-          color="#007322"
-          style={{ opacity: 0.5 }} // hidden — just for layout
-        />
-        <Animated.Text style={[styles.tabLabel, labelStyle]}>
-          {tab.label}
-        </Animated.Text>
-      </Animated.View>
-    </Pressable>
-  );
-}
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const activeIndex = useSharedValue(state.index);

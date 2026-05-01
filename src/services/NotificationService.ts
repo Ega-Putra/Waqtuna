@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import type { IslamicCalendarEvent } from '@/src/services/IslamicCalendarService';
-import type { PrayerScheduleItem } from '@/utils/prayer';
+import type { IslamicCalendarEvent } from '@/services/IslamicCalendarService';
+import type { PrayerScheduleItem } from '@/shared/utils/prayer';
 
 const PRAYER_NOTIFICATION_CHANNEL_ID = 'waqtuna-prayer-times';
 const ISLAMIC_EVENT_NOTIFICATION_CHANNEL_ID = 'waqtuna-islamic-events';

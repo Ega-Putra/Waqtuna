@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   PrayerNotificationKey,
   PrayerNotificationSettings,
-} from '@/src/services/NotificationService';
+} from '@/services/NotificationService';
 
 export const PreferenceStorageKeys = {
   appPreferences: 'waqtuna.app-preferences',

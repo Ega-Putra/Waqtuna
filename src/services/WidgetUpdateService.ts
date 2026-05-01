@@ -5,8 +5,8 @@ import {
   renderChecklistWidget,
   renderDailyPrayerWidget,
   renderNextPrayerWidget,
-} from '@/src/widgets/PrayerWidgets';
-import { WidgetNames } from '@/src/widgets/widgetConstants';
+} from '@/widgets/PrayerWidgets';
+import { WidgetNames } from '@/widgets/widgetConstants';
 
 export async function updateNextPrayerWidget(): Promise<void> {
   if (Platform.OS !== 'android') {

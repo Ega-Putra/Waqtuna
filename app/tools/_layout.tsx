@@ -8,9 +8,11 @@ export default function ToolsStackLayout() {
           backgroundColor: '#E7F0DE',
         },
         headerTintColor: '#007322',
+        headerTitleAlign: 'center',
         headerTitleStyle: {
           fontWeight: '800',
         },
+        statusBarTranslucent: false,
         headerShadowVisible: false,
       }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />

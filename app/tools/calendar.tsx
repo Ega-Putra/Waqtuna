@@ -94,7 +94,9 @@ export default function IslamicCalendarScreen() {
           <Pressable style={styles.navButton} onPress={() => handleChangeMonth(-1)}>
             <MaterialIcons name="chevron-left" size={28} color="#007322" />
           </Pressable>
-          <Text style={styles.monthTitle}>{calendar.title}</Text>
+          <Text numberOfLines={1} style={styles.monthTitle}>
+            {calendar.title}
+          </Text>
           <Pressable style={styles.navButton} onPress={() => handleChangeMonth(1)}>
             <MaterialIcons name="chevron-right" size={28} color="#007322" />
           </Pressable>
@@ -293,18 +295,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#E7F0DE',
   },
   contentContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 6,
     paddingBottom: 28,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 16,
+    gap: 12,
   },
   navButton: {
-    width: 44,
-    height: 44,
+    width: 56,
+    height: 50,
     borderRadius: 14,
     backgroundColor: '#F5FAEF',
     alignItems: 'center',
@@ -313,22 +317,26 @@ const styles = StyleSheet.create({
     borderColor: '#D7E6CB',
   },
   monthTitle: {
+    flex: 1,
     color: '#1D2A21',
     fontSize: 20,
     lineHeight: 26,
     fontWeight: '900',
     textTransform: 'capitalize',
+    textAlign: 'center',
   },
   calendarCard: {
     backgroundColor: '#F5FAEF',
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#D7E6CB',
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
   weekdayRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   weekdayText: {
     flex: 1,
@@ -341,12 +349,15 @@ const styles = StyleSheet.create({
   dayGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    rowGap: 6,
   },
   dayCell: {
     width: `${100 / 7}%`,
-    aspectRatio: 0.9,
+    minHeight: 58,
+    paddingTop: 6,
+    paddingBottom: 8,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     borderRadius: 12,
     position: 'relative',
   },
@@ -361,22 +372,23 @@ const styles = StyleSheet.create({
   gregorianDayText: {
     color: '#1D2A21',
     fontSize: 15,
+    lineHeight: 20,
     fontWeight: '900',
   },
   hijriDayText: {
     color: '#66706A',
     fontSize: 11,
     lineHeight: 15,
-    marginTop: 1,
+    marginTop: 0,
   },
   mutedText: {
     color: '#8A928C',
   },
   eventDot: {
     position: 'absolute',
-    bottom: 6,
-    width: 6,
-    height: 6,
+    bottom: 7,
+    width: 7,
+    height: 7,
     borderRadius: 999,
   },
   majorEventDot: {

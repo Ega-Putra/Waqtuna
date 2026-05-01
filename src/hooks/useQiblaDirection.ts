@@ -21,7 +21,7 @@ export type QiblaDirectionState = {
 
 export function useQiblaDirection(): QiblaDirectionState {
   const [coordinates, setCoordinates] = useState<StoredCoordinates | null>(null);
-  const [cityName, setCityName] = useState('Memuat lokasi');
+  const [cityName, setCityName] = useState('Mengambil lokasi...');
   const [deviceHeading, setDeviceHeading] = useState(0);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +51,7 @@ export function useQiblaDirection(): QiblaDirectionState {
         }
       } catch {
         if (isMounted) {
-          setErrorMessage('Lokasi tidak bisa dimuat.');
+        setErrorMessage('Tidak dapat mengambil lokasi. Pastikan GPS aktif.');
         }
       } finally {
         if (isMounted) {
@@ -82,6 +82,9 @@ export function useQiblaDirection(): QiblaDirectionState {
         setIsSensorAvailable(isAvailable);
 
         if (!isAvailable) {
+          setErrorMessage((currentMessage) =>
+            currentMessage ?? 'Sensor kompas tidak tersedia di perangkat ini'
+          );
           return;
         }
 
@@ -89,6 +92,9 @@ export function useQiblaDirection(): QiblaDirectionState {
 
         if (!isMounted || !permission.granted) {
           setIsSensorAvailable(false);
+          setErrorMessage((currentMessage) =>
+            currentMessage ?? 'Sensor kompas tidak tersedia di perangkat ini'
+          );
           return;
         }
 
@@ -100,6 +106,9 @@ export function useQiblaDirection(): QiblaDirectionState {
       } catch {
         if (isMounted) {
           setIsSensorAvailable(false);
+          setErrorMessage((currentMessage) =>
+            currentMessage ?? 'Sensor kompas tidak tersedia di perangkat ini'
+          );
         }
       }
     }

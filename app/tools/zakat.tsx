@@ -32,6 +32,28 @@ export default function ZakatScreen() {
   const [ricePrice, setRicePrice] = useState('12000');
   const [goldWeight, setGoldWeight] = useState('');
   const [goldKarat, setGoldKarat] = useState<GoldKarat>('24K');
+  const maalErrors = useMemo(
+    () => ({
+      totalAssets: validateNumberInput(totalAssets),
+      totalDebt: validateNumberInput(totalDebt),
+      goldPrice: validateNumberInput(goldPrice),
+    }),
+    [goldPrice, totalAssets, totalDebt]
+  );
+  const incomeErrors = useMemo(
+    () => ({
+      monthlyIncome: validateNumberInput(monthlyIncome),
+      ricePrice: validateNumberInput(ricePrice),
+    }),
+    [monthlyIncome, ricePrice]
+  );
+  const goldErrors = useMemo(
+    () => ({
+      goldWeight: validateNumberInput(goldWeight),
+      goldPrice: validateNumberInput(goldPrice),
+    }),
+    [goldPrice, goldWeight]
+  );
 
   const maalResult = useMemo(
     () =>
@@ -95,6 +117,7 @@ export default function ZakatScreen() {
                 onChangeText={setTotalAssets}
                 suffix="Rp"
                 placeholder="Contoh: 100000000"
+                errorMessage={maalErrors.totalAssets}
               />
               <ZakatInput
                 label="Total Hutang"
@@ -103,6 +126,7 @@ export default function ZakatScreen() {
                 onChangeText={setTotalDebt}
                 suffix="Rp"
                 placeholder="Contoh: 10000000"
+                errorMessage={maalErrors.totalDebt}
               />
               <ZakatInput
                 label="Harga Emas per Gram"
@@ -110,6 +134,7 @@ export default function ZakatScreen() {
                 onChangeText={setGoldPrice}
                 suffix="Rp"
                 placeholder="1500000"
+                errorMessage={maalErrors.goldPrice}
               />
             </View>
             <ZakatResult
@@ -131,6 +156,7 @@ export default function ZakatScreen() {
                 onChangeText={setMonthlyIncome}
                 suffix="Rp"
                 placeholder="Contoh: 8000000"
+                errorMessage={incomeErrors.monthlyIncome}
               />
               <ZakatInput
                 label="Harga Beras per Kg"
@@ -138,6 +164,7 @@ export default function ZakatScreen() {
                 onChangeText={setRicePrice}
                 suffix="Rp"
                 placeholder="12000"
+                errorMessage={incomeErrors.ricePrice}
               />
             </View>
             <ZakatResult
@@ -159,6 +186,7 @@ export default function ZakatScreen() {
                 onChangeText={setGoldWeight}
                 suffix="gram"
                 placeholder="Contoh: 100"
+                errorMessage={goldErrors.goldWeight}
               />
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Kadar Emas</Text>
@@ -188,6 +216,7 @@ export default function ZakatScreen() {
                 onChangeText={setGoldPrice}
                 suffix="Rp"
                 placeholder="1500000"
+                errorMessage={goldErrors.goldPrice}
               />
             </View>
             <ZakatResult
@@ -212,6 +241,7 @@ function ZakatInput({
   onChangeText,
   suffix,
   placeholder,
+  errorMessage,
 }: {
   label: string;
   description?: string;
@@ -219,6 +249,7 @@ function ZakatInput({
   onChangeText: (value: string) => void;
   suffix: string;
   placeholder: string;
+  errorMessage?: string | null;
 }) {
   return (
     <View style={styles.inputGroup}>
@@ -235,6 +266,7 @@ function ZakatInput({
         />
         <Text style={styles.inputSuffix}>{suffix}</Text>
       </View>
+      {errorMessage ? <Text style={styles.inputError}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -280,9 +312,25 @@ function ResultRow({ label, value }: { label: string; value: string }) {
 }
 
 function parseNumber(value: string) {
-  const numericValue = Number(value.replace(/[^\d]/g, ''));
+  const numericValue = Number(value.replace(/[^\d-]/g, ''));
 
-  return Number.isFinite(numericValue) ? numericValue : 0;
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+}
+
+function validateNumberInput(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return 'Masukkan nominal terlebih dahulu';
+  }
+
+  const numericValue = Number(trimmedValue.replace(/[^\d-]/g, ''));
+
+  if (Number.isFinite(numericValue) && numericValue < 0) {
+    return 'Angka tidak boleh negatif';
+  }
+
+  return null;
 }
 
 function formatRupiah(value: number) {
@@ -384,6 +432,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     marginLeft: 8,
+  },
+  inputError: {
+    color: '#B42318',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
   },
   optionGrid: {
     flexDirection: 'row',

@@ -36,7 +36,7 @@ export default function QiblaScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <View style={styles.container}>
-        <Text style={styles.locationText}>{cityName}</Text>
+        <Text style={styles.locationText}>{isLoading ? 'Mengambil lokasi...' : cityName}</Text>
 
         <View style={styles.compassWrap}>
           <View style={styles.compassRing}>
@@ -67,7 +67,7 @@ export default function QiblaScreen() {
 
         {!isSensorAvailable ? (
           <Text style={styles.warningText}>
-            Sensor kompas tidak tersedia. Arah kiblat tetap ditampilkan sebagai derajat dari utara.
+            Sensor kompas tidak tersedia di perangkat ini. Arah kiblat tetap ditampilkan sebagai derajat dari utara.
           </Text>
         ) : null}
 

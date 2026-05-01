@@ -3,10 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/src/components/EmptyState';
+import { SkeletonBox } from '@/src/components/SkeletonBox';
 import {
   IslamicCalendarService,
   type IslamicCalendarDay,
   type IslamicCalendarEvent,
+  type IslamicCalendarMonth,
 } from '@/src/services/IslamicCalendarService';
 import { scheduleIslamicEventNotifications } from '@/src/services/NotificationService';
 
@@ -14,11 +17,56 @@ const weekdayLabels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 export default function IslamicCalendarScreen() {
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
-  const calendar = useMemo(
-    () => IslamicCalendarService.getMonthCalendar(visibleMonth),
-    [visibleMonth]
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(true);
+  const [isGregorianFallback, setIsGregorianFallback] = useState(false);
+  const [calendar, setCalendar] = useState<IslamicCalendarMonth>(() =>
+    createGregorianFallbackCalendar(new Date())
   );
-  const upcomingEvents = useMemo(() => IslamicCalendarService.getUpcomingEvents(30), []);
+  const upcomingEvents = useMemo(
+    () => {
+      if (isGregorianFallback) {
+        return [];
+      }
+
+      try {
+        return IslamicCalendarService.getUpcomingEvents(30);
+      } catch {
+        return [];
+      }
+    },
+    [isGregorianFallback]
+  );
+
+  useEffect(() => {
+    let isActive = true;
+
+    setIsLoadingCalendar(true);
+
+    const timeout = setTimeout(() => {
+      try {
+        const nextCalendar = IslamicCalendarService.getMonthCalendar(visibleMonth);
+
+        if (isActive) {
+          setCalendar(nextCalendar);
+          setIsGregorianFallback(false);
+        }
+      } catch {
+        if (isActive) {
+          setCalendar(createGregorianFallbackCalendar(visibleMonth));
+          setIsGregorianFallback(true);
+        }
+      } finally {
+        if (isActive) {
+          setIsLoadingCalendar(false);
+        }
+      }
+    }, 120);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeout);
+    };
+  }, [visibleMonth]);
 
   useEffect(() => {
     const reminderEvents = IslamicCalendarService.getReminderEvents();
@@ -52,21 +100,35 @@ export default function IslamicCalendarScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.calendarCard}>
-          <View style={styles.weekdayRow}>
-            {weekdayLabels.map((label) => (
-              <Text key={label} style={styles.weekdayText}>
-                {label}
-              </Text>
-            ))}
-          </View>
+        {isLoadingCalendar ? (
+          <CalendarGridSkeleton />
+        ) : (
+          <View style={styles.calendarCard}>
+            <View style={styles.weekdayRow}>
+              {weekdayLabels.map((label) => (
+                <Text key={label} style={styles.weekdayText}>
+                  {label}
+                </Text>
+              ))}
+            </View>
 
-          <View style={styles.dayGrid}>
-            {calendar.days.map((day) => (
-              <CalendarDayCell key={day.date.toISOString()} day={day} />
-            ))}
+            <View style={styles.dayGrid}>
+              {calendar.days.map((day) => (
+                <CalendarDayCell
+                  key={day.date.toISOString()}
+                  day={day}
+                  hideHijri={isGregorianFallback}
+                />
+              ))}
+            </View>
           </View>
-        </View>
+        )}
+
+        {isGregorianFallback ? (
+          <Text style={styles.fallbackBanner}>
+            Konversi Hijriah gagal. Menampilkan kalender Masehi saja.
+          </Text>
+        ) : null}
 
         <View style={styles.legendRow}>
           <LegendDot color="#007322" label="Hari besar" />
@@ -82,7 +144,7 @@ export default function IslamicCalendarScreen() {
           {upcomingEvents.length > 0 ? (
             upcomingEvents.map((event) => <EventCard key={`${event.id}-${event.hijriDay}`} event={event} />)
           ) : (
-            <Text style={styles.emptyText}>Tidak ada hari besar dalam 30 hari ke depan.</Text>
+            <EmptyState title="Tidak ada hari besar" subtitle="Tidak ada hari besar dalam 30 hari ke depan." />
           )}
         </View>
       </ScrollView>
@@ -90,7 +152,7 @@ export default function IslamicCalendarScreen() {
   );
 }
 
-function CalendarDayCell({ day }: { day: IslamicCalendarDay }) {
+function CalendarDayCell({ day, hideHijri }: { day: IslamicCalendarDay; hideHijri?: boolean }) {
   const primaryEvent = day.events[0] ?? null;
 
   return (
@@ -103,10 +165,12 @@ function CalendarDayCell({ day }: { day: IslamicCalendarDay }) {
       <Text style={[styles.gregorianDayText, !day.isCurrentMonth && styles.mutedText]}>
         {day.gregorianDay}
       </Text>
-      <Text style={[styles.hijriDayText, !day.isCurrentMonth && styles.mutedText]}>
-        {day.hijri.day}
-      </Text>
-      {primaryEvent ? (
+      {!hideHijri ? (
+        <Text style={[styles.hijriDayText, !day.isCurrentMonth && styles.mutedText]}>
+          {day.hijri.day}
+        </Text>
+      ) : null}
+      {primaryEvent && !hideHijri ? (
         <View
           style={[
             styles.eventDot,
@@ -116,6 +180,61 @@ function CalendarDayCell({ day }: { day: IslamicCalendarDay }) {
       ) : null}
     </View>
   );
+}
+
+function CalendarGridSkeleton() {
+  return (
+    <View style={styles.calendarCard}>
+      <View style={styles.weekdayRow}>
+        {weekdayLabels.map((label) => (
+          <Text key={label} style={styles.weekdayText}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.dayGrid}>
+        {Array.from({ length: 42 }).map((_, index) => (
+          <View key={index} style={styles.dayCell}>
+            <SkeletonBox width={24} height={16} borderRadius={6} />
+            <SkeletonBox width={18} height={10} borderRadius={5} style={styles.calendarSkeletonLine} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function createGregorianFallbackCalendar(monthDate: Date) {
+  const normalizedMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const firstVisibleDate = new Date(normalizedMonth);
+  const today = new Date();
+
+  firstVisibleDate.setDate(normalizedMonth.getDate() - normalizedMonth.getDay());
+
+  return {
+    monthDate: normalizedMonth,
+    title: new Intl.DateTimeFormat('id-ID', {
+      month: 'long',
+      year: 'numeric',
+    }).format(normalizedMonth),
+    days: Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(firstVisibleDate);
+
+      date.setDate(firstVisibleDate.getDate() + index);
+
+      return {
+        date,
+        gregorianDay: date.getDate(),
+        hijri: { day: 0, month: 0, year: 0 },
+        isCurrentMonth: date.getMonth() === normalizedMonth.getMonth(),
+        isToday:
+          date.getFullYear() === today.getFullYear() &&
+          date.getMonth() === today.getMonth() &&
+          date.getDate() === today.getDate(),
+        events: [],
+      };
+    }),
+  };
 }
 
 function EventCard({ event }: { event: IslamicCalendarEvent }) {
@@ -272,6 +391,21 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 18,
   },
+  fallbackBanner: {
+    color: '#7A4E00',
+    backgroundColor: '#FFF7D6',
+    borderWidth: 1,
+    borderColor: '#F2D17A',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  calendarSkeletonLine: {
+    marginTop: 6,
+  },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,12 +472,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: 3,
-  },
-  emptyText: {
-    color: '#66706A',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    marginTop: 10,
   },
 });

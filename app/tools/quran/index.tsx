@@ -12,6 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/src/components/EmptyState';
+import { ErrorState } from '@/src/components/ErrorState';
+import { SkeletonBox } from '@/src/components/SkeletonBox';
 import { QuranService } from '@/src/services/QuranService';
 import type { Juz, SearchResult, Surah } from '@/src/types/quran';
 
@@ -75,7 +78,7 @@ export default function QuranScreen() {
       setSurahs(data);
       setCacheMessage(QuranService.getCacheNotice()?.message ?? null);
     } catch {
-      setErrorMessage('Daftar surat gagal dimuat.');
+      setErrorMessage('Gagal memuat data Al-Quran');
     } finally {
       setIsLoadingSurahs(false);
     }
@@ -88,7 +91,7 @@ export default function QuranScreen() {
       setJuzs(data);
       setCacheMessage(QuranService.getCacheNotice()?.message ?? null);
     } catch {
-      setErrorMessage('Daftar juz gagal dimuat.');
+      setErrorMessage('Gagal memuat data Al-Quran');
     } finally {
       setIsLoadingJuzs(false);
     }
@@ -138,19 +141,15 @@ export default function QuranScreen() {
           ))}
         </View>
 
-        {cacheMessage ? <Text style={styles.cacheBanner}>{cacheMessage}</Text> : null}
+        {cacheMessage ? <Text style={styles.cacheBanner}>Menampilkan data dari cache</Text> : null}
         {errorMessage ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-            <Pressable
-              style={styles.retryButton}
-              onPress={() => {
-                void loadSurahs();
-                void loadJuzs();
-              }}>
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
-          </View>
+          <ErrorState
+            message={errorMessage}
+            onRetry={() => {
+              void loadSurahs();
+              void loadJuzs();
+            }}
+          />
         ) : null}
 
         {activeTab === 'surah' ? (
@@ -165,7 +164,13 @@ export default function QuranScreen() {
                 </Pressable>
               ) : null
             }
-            ListEmptyComponent={isLoadingSurahs ? <SkeletonList /> : null}
+            ListEmptyComponent={
+              isLoadingSurahs ? (
+                <SkeletonList />
+              ) : !errorMessage ? (
+                <EmptyState title="Belum ada data surat" subtitle="Coba muat ulang beberapa saat lagi." />
+              ) : null
+            }
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
               <Pressable style={styles.surahCard} onPress={() => void openSurah(item.id)}>
@@ -188,7 +193,13 @@ export default function QuranScreen() {
           <FlatList
             data={isLoadingJuzs ? [] : juzs}
             keyExtractor={(item) => String(item.id)}
-            ListEmptyComponent={isLoadingJuzs ? <SkeletonList /> : null}
+            ListEmptyComponent={
+              isLoadingJuzs ? (
+                <SkeletonList />
+              ) : !errorMessage ? (
+                <EmptyState title="Belum ada data juz" subtitle="Coba muat ulang beberapa saat lagi." />
+              ) : null
+            }
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
               <View style={styles.surahCard}>
@@ -222,7 +233,7 @@ export default function QuranScreen() {
             }
             ListEmptyComponent={
               searchQuery.trim() && !isSearching ? (
-                <Text style={styles.emptyText}>Tidak ada hasil.</Text>
+                <EmptyState title="Tidak ada hasil" subtitle="Coba kata kunci lain." />
               ) : null
             }
             contentContainerStyle={styles.listContent}
@@ -242,8 +253,15 @@ export default function QuranScreen() {
 function SkeletonList() {
   return (
     <View style={styles.skeletonWrap}>
-      {Array.from({ length: 8 }).map((_, index) => (
-        <View key={index} style={styles.skeletonItem} />
+      {Array.from({ length: 10 }).map((_, index) => (
+        <View key={index} style={styles.skeletonItem}>
+          <SkeletonBox width={38} height={38} borderRadius={999} />
+          <View style={styles.skeletonTextBlock}>
+            <SkeletonBox width="58%" height={14} />
+            <SkeletonBox width="76%" height={12} />
+          </View>
+          <SkeletonBox width={54} height={24} />
+        </View>
       ))}
     </View>
   );
@@ -331,30 +349,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  errorBox: {
-    backgroundColor: '#FEE4E2',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-  },
-  errorText: {
-    color: '#B42318',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  retryButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#B42318',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 8,
-  },
-  retryText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
   listContent: {
     paddingBottom: 24,
     gap: 10,
@@ -425,7 +419,17 @@ const styles = StyleSheet.create({
   skeletonItem: {
     height: 72,
     borderRadius: 18,
-    backgroundColor: '#D7E6CB',
+    backgroundColor: '#F5FAEF',
+    borderWidth: 1,
+    borderColor: '#D7E6CB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+  },
+  skeletonTextBlock: {
+    flex: 1,
+    gap: 9,
   },
   searchHeader: {
     marginBottom: 10,
@@ -444,12 +448,6 @@ const styles = StyleSheet.create({
     color: '#66706A',
     fontSize: 13,
     marginTop: 8,
-  },
-  emptyText: {
-    color: '#66706A',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 24,
   },
   searchCard: {
     borderRadius: 16,

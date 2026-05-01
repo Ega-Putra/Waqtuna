@@ -3,7 +3,6 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -13,6 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ErrorState } from '@/src/components/ErrorState';
+import { SkeletonBox } from '@/src/components/SkeletonBox';
 import { QuranService } from '@/src/services/QuranService';
 import type { Ayah, Surah, SurahDetail } from '@/src/types/quran';
 
@@ -62,7 +63,7 @@ export default function SurahReaderScreen() {
       setScrollOffset(Number(storedScrollOffset) || 0);
       setCacheMessage(QuranService.getCacheNotice()?.message ?? null);
     } catch {
-      setErrorMessage('Surat gagal dimuat.');
+      setErrorMessage('Gagal memuat surat ini');
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +127,7 @@ export default function SurahReaderScreen() {
           </Text>
         </View>
 
-        {cacheMessage ? <Text style={styles.cacheBanner}>{cacheMessage}</Text> : null}
+        {cacheMessage ? <Text style={styles.cacheBanner}>Menampilkan data dari cache</Text> : null}
 
         <View style={styles.fontControlCard}>
           <Text style={styles.controlTitle}>Ukuran font Arab</Text>
@@ -146,19 +147,11 @@ export default function SurahReaderScreen() {
         </View>
 
         {isLoading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color="#007322" />
-            <Text style={styles.loadingText}>Memuat ayat...</Text>
-          </View>
+          <AyahSkeletonList />
         ) : null}
 
         {errorMessage ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-            <Pressable style={styles.retryButton} onPress={() => void loadReaderState()}>
-              <Text style={styles.retryText}>Retry</Text>
-            </Pressable>
-          </View>
+          <ErrorState message={errorMessage} onRetry={() => void loadReaderState()} />
         ) : null}
 
         {!isLoading && parsedSurahId !== 9 ? (
@@ -197,6 +190,24 @@ export default function SurahReaderScreen() {
         ))}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function AyahSkeletonList() {
+  return (
+    <View style={styles.ayahSkeletonWrap}>
+      {Array.from({ length: 6 }).map((_, index) => (
+        <View key={index} style={styles.ayahSkeletonCard}>
+          <View style={styles.ayahSkeletonHeader}>
+            <SkeletonBox width={36} height={36} borderRadius={999} />
+            <SkeletonBox width={82} height={34} borderRadius={999} />
+          </View>
+          <SkeletonBox width="92%" height={28} style={styles.ayahSkeletonArabic} />
+          <SkeletonBox width="100%" height={14} />
+          <SkeletonBox width="84%" height={14} />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -323,37 +334,24 @@ const styles = StyleSheet.create({
   fontStepTextActive: {
     color: '#FFFFFF',
   },
-  loadingWrap: {
+  ayahSkeletonWrap: {
+    gap: 12,
+  },
+  ayahSkeletonCard: {
+    backgroundColor: '#F5FAEF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#D7E6CB',
+    padding: 14,
+    gap: 12,
+  },
+  ayahSkeletonHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 26,
   },
-  loadingText: {
-    color: '#66706A',
-    fontSize: 14,
-    marginTop: 8,
-  },
-  errorBox: {
-    backgroundColor: '#FEE4E2',
-    borderRadius: 12,
-    padding: 10,
-  },
-  errorText: {
-    color: '#B42318',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  retryButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#B42318',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 8,
-  },
-  retryText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
+  ayahSkeletonArabic: {
+    alignSelf: 'flex-end',
   },
   basmalahText: {
     color: '#007322',

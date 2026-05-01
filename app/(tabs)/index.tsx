@@ -6,7 +6,6 @@ import {
 } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -19,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type IndonesiaCity } from '@/constants/indonesia-cities';
+import { SkeletonBox } from '@/src/components/SkeletonBox';
 import {
   defaultIndonesiaCity,
   getInitialLocationState,
@@ -319,9 +319,18 @@ export default function HomeScreen() {
         </View>
 
         {locationError ? (
-          <View style={styles.locationErrorBox}>
-            <MaterialIcons name="info-outline" size={18} color="#7A4E00" />
+          <View style={styles.locationErrorCard}>
+            <View style={styles.locationErrorHeader}>
+              <MaterialIcons name="location-off" size={22} color="#B42318" />
+              <Text style={styles.locationErrorTitle}>Tidak bisa mendeteksi lokasi</Text>
+            </View>
             <Text style={styles.locationErrorText}>{locationError}</Text>
+            <Pressable
+              style={styles.locationErrorButton}
+              onPress={() => setIsLocationPickerVisible(true)}
+              accessibilityRole="button">
+              <Text style={styles.locationErrorButtonText}>Pilih Kota Manual</Text>
+            </Pressable>
           </View>
         ) : null}
 
@@ -329,7 +338,7 @@ export default function HomeScreen() {
           <View style={styles.heroCircle} />
           <View style={styles.heroContent}>
             {isBootstrapping ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <HeroScheduleSkeleton />
             ) : (
               <>
                 <Text style={styles.heroTitle}>{schedule.nextPrayerName}</Text>
@@ -351,28 +360,34 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.progressWrap}>
-          <Text style={styles.progressText}>
-            {dailyProgress.checked}/{dailyProgress.total} sholat hari ini
-          </Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-          </View>
-        </View>
+        {isBootstrapping ? (
+          <PrayerListSkeleton />
+        ) : (
+          <>
+            <View style={styles.progressWrap}>
+              <Text style={styles.progressText}>
+                {dailyProgress.checked}/{dailyProgress.total} sholat hari ini
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+              </View>
+            </View>
 
-        <View style={styles.listWrap}>
-          {schedule.prayers.map((item) => (
-            <PrayerReminderCard
-              key={item.key}
-              name={item.name}
-              time={item.time}
-              icon={prayerIcons[item.key]}
-              isHighlighted={item.name === schedule.nextPrayerName}
-              isChecked={Boolean(prayerChecklist[item.name])}
-              onToggle={() => void handleTogglePrayer(item.name)}
-            />
-          ))}
-        </View>
+            <View style={styles.listWrap}>
+              {schedule.prayers.map((item) => (
+                <PrayerReminderCard
+                  key={item.key}
+                  name={item.name}
+                  time={item.time}
+                  icon={prayerIcons[item.key]}
+                  isHighlighted={item.name === schedule.nextPrayerName}
+                  isChecked={Boolean(prayerChecklist[item.name])}
+                  onToggle={() => void handleTogglePrayer(item.name)}
+                />
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <Modal
@@ -431,6 +446,35 @@ function getMillisecondsUntilNextMidnight() {
   nextMidnight.setHours(0, 0, 5, 0);
 
   return nextMidnight.getTime() - now.getTime();
+}
+
+function HeroScheduleSkeleton() {
+  return (
+    <View style={styles.heroSkeletonWrap}>
+      <SkeletonBox width={112} height={24} borderRadius={8} style={styles.heroSkeletonBox} />
+      <SkeletonBox width={168} height={54} borderRadius={12} style={styles.heroSkeletonBox} />
+      <SkeletonBox width={184} height={18} borderRadius={8} style={styles.heroSkeletonBox} />
+    </View>
+  );
+}
+
+function PrayerListSkeleton() {
+  return (
+    <View style={styles.listWrap}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <View key={index} style={styles.prayerSkeletonCard}>
+          <View style={styles.prayerSkeletonLeft}>
+            <SkeletonBox width={52} height={52} borderRadius={999} />
+            <View style={styles.prayerSkeletonText}>
+              <SkeletonBox width={90} height={16} />
+              <SkeletonBox width={56} height={14} />
+            </View>
+          </View>
+          <SkeletonBox width={72} height={28} borderRadius={12} />
+        </View>
+      ))}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -505,25 +549,45 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     maxWidth: 180,
   },
-  locationErrorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  locationErrorCard: {
     backgroundColor: '#FFF7D6',
     borderWidth: 1,
     borderColor: '#F2D17A',
     borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    padding: 12,
     marginTop: -8,
     marginBottom: 18,
   },
+  locationErrorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  locationErrorTitle: {
+    color: '#7A271A',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '900',
+  },
   locationErrorText: {
-    flex: 1,
     color: '#7A4E00',
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
+  },
+  locationErrorButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#007322',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  locationErrorButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
   },
   streakPill: {
     flexDirection: 'row',
@@ -570,6 +634,12 @@ const styles = StyleSheet.create({
     width: '68%',
     minHeight: 120,
     justifyContent: 'center',
+  },
+  heroSkeletonWrap: {
+    gap: 12,
+  },
+  heroSkeletonBox: {
+    backgroundColor: '#D9F7DF',
   },
   heroTitle: {
     color: '#FFFFFF',
@@ -639,6 +709,28 @@ const styles = StyleSheet.create({
   },
   listWrap: {
     gap: 10,
+  },
+  prayerSkeletonCard: {
+    minHeight: 80,
+    borderRadius: 24,
+    backgroundColor: '#F5FAEF',
+    borderWidth: 1,
+    borderColor: '#D7E6CB',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  prayerSkeletonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  prayerSkeletonText: {
+    gap: 9,
+    flex: 1,
   },
   prayerCard: {
     minHeight: 80,

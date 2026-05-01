@@ -16,18 +16,25 @@ export default function QiblaScreen() {
     errorMessage,
   } = useQiblaDirection();
   const rotation = useRef(new Animated.Value(0)).current;
+  const displayedAngle = useRef(0);
 
   useEffect(() => {
+    const nextRotation = getClosestRotation(
+      displayedAngle.current,
+      normalizeDegrees(qiblaRelativeAngle + 180)
+    );
+
+    displayedAngle.current = nextRotation;
     Animated.timing(rotation, {
-      toValue: qiblaRelativeAngle,
+      toValue: nextRotation,
       duration: 260,
       useNativeDriver: true,
     }).start();
   }, [qiblaRelativeAngle, rotation]);
 
   const animatedRotation = rotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
+    inputRange: [-720, -360, 0, 360, 720],
+    outputRange: ['-720deg', '-360deg', '0deg', '360deg', '720deg'],
   });
 
   const roundedBearing = Math.round(qiblaBearing);
@@ -81,6 +88,18 @@ export default function QiblaScreen() {
       </View>
     </SafeAreaView>
   );
+}
+
+function getClosestRotation(currentAngle: number, targetAngle: number) {
+  const normalizedCurrent = normalizeDegrees(currentAngle);
+  const normalizedTarget = normalizeDegrees(targetAngle);
+  const shortestDelta = normalizeDegrees(normalizedTarget - normalizedCurrent + 180) - 180;
+
+  return currentAngle + shortestDelta;
+}
+
+function normalizeDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
 }
 
 const styles = StyleSheet.create({

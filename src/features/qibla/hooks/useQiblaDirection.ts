@@ -88,19 +88,15 @@ export function useQiblaDirection(): QiblaDirectionState {
           return;
         }
 
-        const permission = await Magnetometer.requestPermissionsAsync();
-
-        if (!isMounted || !permission.granted) {
-          setIsSensorAvailable(false);
-          setErrorMessage((currentMessage) =>
-            currentMessage ?? 'Sensor kompas tidak tersedia di perangkat ini'
-          );
-          return;
-        }
-
-        Magnetometer.setUpdateInterval(250);
+        Magnetometer.setUpdateInterval(220);
         subscription = Magnetometer.addListener((measurement) => {
-          setDeviceHeading(calculateHeading(measurement));
+          if (!isMounted) {
+            return;
+          }
+
+          setDeviceHeading((currentHeading) =>
+            smoothHeading(currentHeading, calculateHeading(measurement))
+          );
           setAccuracy(estimateMagnetometerAccuracy(measurement));
         });
       } catch {
@@ -156,9 +152,15 @@ function calculateQiblaBearing(coordinates: StoredCoordinates) {
 }
 
 function calculateHeading({ x, y }: MagnetometerMeasurement) {
-  const angle = Math.atan2(y, x);
+  const rawAngle = radiansToDegrees(Math.atan2(y, x));
 
-  return normalizeDegrees(90 - radiansToDegrees(angle));
+  return normalizeDegrees(90 - rawAngle);
+}
+
+function smoothHeading(currentHeading: number, nextHeading: number) {
+  const shortestDelta = normalizeDegrees(nextHeading - currentHeading + 180) - 180;
+
+  return normalizeDegrees(currentHeading + shortestDelta * 0.22);
 }
 
 function estimateMagnetometerAccuracy({ x, y, z }: MagnetometerMeasurement) {

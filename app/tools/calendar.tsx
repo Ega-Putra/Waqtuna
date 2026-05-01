@@ -349,10 +349,9 @@ const styles = StyleSheet.create({
   dayGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: 6,
   },
   dayCell: {
-    width: `${100 / 7}%`,
+    width: '14.2857%',
     minHeight: 58,
     paddingTop: 6,
     paddingBottom: 8,
@@ -360,6 +359,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     borderRadius: 12,
     position: 'relative',
+    marginBottom: 6,
   },
   dayCellMuted: {
     opacity: 0.38,

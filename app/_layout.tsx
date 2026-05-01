@@ -1,7 +1,7 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,8 +21,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
-  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
-  const [isOnboardingCompleted, setIsOnboardingCompleted] = useState<boolean | null>(null);
 
   useEffect(() => {
     void PuasaReminderService.scheduleAll();
@@ -54,40 +52,31 @@ export default function RootLayout() {
   useEffect(() => {
     let isMounted = true;
 
-    async function checkOnboarding() {
-      const completed = await getOnboardingCompleted();
+    async function guardOnboardingRoute() {
+      const isOnboardingCompleted = await getOnboardingCompleted();
 
       if (!isMounted) {
         return;
       }
 
-      setIsOnboardingCompleted(completed);
-      setIsCheckingOnboarding(false);
+      const isOnboardingRoute = segments[0] === 'onboarding';
+
+      if (!isOnboardingCompleted && !isOnboardingRoute) {
+        router.replace('/onboarding');
+        return;
+      }
+
+      if (isOnboardingCompleted && isOnboardingRoute) {
+        router.replace('/(tabs)');
+      }
     }
 
-    void checkOnboarding();
+    void guardOnboardingRoute();
 
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  useEffect(() => {
-    if (isCheckingOnboarding || isOnboardingCompleted === null) {
-      return;
-    }
-
-    const isOnboardingRoute = segments[0] === 'onboarding';
-
-    if (!isOnboardingCompleted && !isOnboardingRoute) {
-      router.replace('/onboarding');
-      return;
-    }
-
-    if (isOnboardingCompleted && isOnboardingRoute) {
-      router.replace('/(tabs)');
-    }
-  }, [isCheckingOnboarding, isOnboardingCompleted, router, segments]);
+  }, [router, segments]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

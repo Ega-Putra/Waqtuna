@@ -2,10 +2,11 @@ import {
   Ionicons,
   MaterialCommunityIcons,
   MaterialIcons,
-  SimpleLineIcons,
 } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   Modal,
   Pressable,
@@ -19,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type IndonesiaCity } from '@/constants/indonesia-cities';
 import { SkeletonBox } from '@/src/components/SkeletonBox';
+import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 import {
   defaultIndonesiaCity,
   getInitialLocationState,
@@ -44,48 +46,73 @@ import { getPrayerSchedule, type PrayerScheduleItem } from '@/utils/prayer';
 import { getCalendarDateParts } from '@/utils/time';
 
 const prayerIcons: Record<PrayerScheduleItem['key'], React.ReactNode> = {
-  fajr: <MaterialCommunityIcons name="weather-sunset-up" size={28} color="#FFFFFF" />,
-  dhuhr: <MaterialCommunityIcons name="white-balance-sunny" size={28} color="#FFFFFF" />,
-  asr: <MaterialCommunityIcons name="weather-partly-cloudy" size={28} color="#FFFFFF" />,
-  maghrib: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={28} color="#FFFFFF" />,
-  isha: <MaterialCommunityIcons name="moon-waning-crescent" size={28} color="#FFFFFF" />,
+  fajr: <MaterialCommunityIcons name="weather-sunset-up" size={24} color={colors.primary} />,
+  dhuhr: <MaterialCommunityIcons name="white-balance-sunny" size={24} color={colors.primary} />,
+  asr: <MaterialCommunityIcons name="weather-partly-cloudy" size={24} color={colors.primary} />,
+  maghrib: <MaterialCommunityIcons name="weather-night-partly-cloudy" size={24} color={colors.primary} />,
+  isha: <MaterialCommunityIcons name="moon-waning-crescent" size={24} color={colors.primary} />,
+};
+
+const prayerArabicNames: Record<PrayerScheduleItem['key'], string> = {
+  fajr: 'الفجر',
+  dhuhr: 'الظهر',
+  asr: 'العصر',
+  maghrib: 'المغرب',
+  isha: 'العشاء',
 };
 
 function PrayerReminderCard({
+  prayerKey,
   name,
   time,
   icon,
-  isHighlighted,
+  status,
   isChecked,
   onToggle,
 }: {
+  prayerKey: PrayerScheduleItem['key'];
   name: string;
   time: string;
   icon: React.ReactNode;
-  isHighlighted?: boolean;
+  status: 'past' | 'next' | 'upcoming';
   isChecked?: boolean;
   onToggle: () => void;
 }) {
+  const isNext = status === 'next';
+  const isPast = status === 'past';
+
   return (
-    <View style={[styles.prayerCard, isHighlighted && styles.prayerCardHighlighted]}>
-      <View style={styles.prayerInfo}>
-        <View style={styles.prayerIconWrap}>{icon}</View>
-        <View style={styles.prayerTextBlock}>
-          <Text style={styles.prayerName}>{name}</Text>
-          <Text style={styles.prayerTime}>{time}</Text>
-        </View>
+    <View
+      style={[
+        styles.prayerCard,
+        isNext && styles.prayerCardActive,
+        isPast && styles.prayerCardPast,
+      ]}>
+      <View style={[styles.prayerIconWrap, isNext && styles.prayerIconWrapActive]}>
+        {isNext ? clonePrayerIcon(prayerKey, '#FFFFFF') : icon}
       </View>
 
-      <View style={styles.prayerActions}>
-        <SimpleLineIcons name="bell" size={23} color="#FFFFFF" />
-        <Pressable
-          style={[styles.checkButton, isChecked && styles.checkButtonChecked]}
-          onPress={onToggle}
-          accessibilityRole="button"
-          accessibilityLabel={`Tandai sholat ${name}`}>
-          <MaterialIcons name="check" size={19} color={isChecked ? '#FFFFFF' : '#A2ABB3'} />
-        </Pressable>
-      </View>
+      <Text style={[styles.prayerArabicName, isNext && styles.prayerCardTextActive]}>
+        {prayerArabicNames[prayerKey]}
+      </Text>
+      <Text style={[styles.prayerName, isNext && styles.prayerCardTextActive]}>{name}</Text>
+      <Text style={[styles.prayerTime, isNext && styles.prayerCardTextActive]}>{time}</Text>
+
+      <Pressable
+        style={[
+          styles.checkButton,
+          isNext && styles.checkButtonActiveCard,
+          isChecked && styles.checkButtonChecked,
+        ]}
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityLabel={`Tandai sholat ${name}`}>
+        <MaterialIcons
+          name={isChecked ? 'check-circle' : 'radio-button-unchecked'}
+          size={22}
+          color={isNext ? '#FFFFFF' : isChecked ? colors.primary : colors.textMuted}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -282,42 +309,41 @@ export default function HomeScreen() {
 
   const progressPercentage =
     dailyProgress.total > 0 ? (dailyProgress.checked / dailyProgress.total) * 100 : 0;
+  const countdownInfo = getCountdownInfo(schedule);
+  const prayerProgressPercentage = getPrayerWindowProgress(schedule.prayers, schedule.nextPrayerName);
+  const isUrgentCountdown = countdownInfo.totalMinutes < 10;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.fixedHeader}>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.greeting}>Assalamu Alaikum</Text>
+            <Text style={styles.dateTitle}>{gregorianDate}</Text>
+            <Text style={styles.hijriDate}>{hijriDate}</Text>
+          </View>
+
+          <Pressable
+            style={styles.locationChip}
+            onPress={() => setIsLocationPickerVisible(true)}
+            accessibilityRole="button">
+            <Ionicons name="location" size={15} color="#FFFFFF" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {getLocationLabel(selectedCity)}
+            </Text>
+            <MaterialIcons name="keyboard-arrow-down" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </LinearGradient>
+
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.appTitle}>Waqtuna</Text>
-
-        <View style={styles.headerRow}>
-          <Text style={styles.greeting}>Assalamu Alaikum, Abi</Text>
-          <Text style={styles.hijriDate}>{hijriDate}</Text>
-        </View>
-
-        <View style={styles.overviewRow}>
-          <View style={styles.overviewMain}>
-            <Text style={styles.dateTitle}>{gregorianDate}</Text>
-
-            <Pressable
-              style={styles.locationRow}
-              onPress={() => setIsLocationPickerVisible(true)}
-              accessibilityRole="button">
-              <Ionicons name="location-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {getLocationLabel(selectedCity)}
-              </Text>
-              <MaterialIcons name="keyboard-arrow-down" size={18} color="#FFFFFF" />
-            </Pressable>
-          </View>
-
-          <View style={styles.streakPill}>
-            <MaterialCommunityIcons name="fire" size={15} color="#F97316" />
-            <Text style={styles.streakText}>{streak} Hari Beruntun</Text>
-          </View>
-        </View>
-
         {locationError ? (
           <View style={styles.locationErrorCard}>
             <View style={styles.locationErrorHeader}>
@@ -334,29 +360,63 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <View style={styles.heroCard}>
-          <View style={styles.heroCircle} />
-          <View style={styles.heroContent}>
-            {isBootstrapping ? (
-              <HeroScheduleSkeleton />
-            ) : (
-              <>
-                <Text style={styles.heroTitle}>{schedule.nextPrayerName}</Text>
-                <Text style={styles.heroTime}>{schedule.nextPrayerHeroTime}</Text>
-                <View style={styles.countdownRow}>
-                  <MaterialCommunityIcons name="clock-outline" size={19} color="#FFFFFF" />
-                  <Text style={styles.countdownText}>{schedule.countdownText}</Text>
+        <View style={styles.countdownCard}>
+          {isBootstrapping ? (
+            <HeroScheduleSkeleton />
+          ) : (
+            <>
+              <View style={styles.countdownHeader}>
+                <View>
+                  <Text style={styles.countdownLabel}>Sholat berikutnya</Text>
+                  <Text style={styles.nextPrayerName}>{schedule.nextPrayerName}</Text>
                 </View>
-              </>
-            )}
-          </View>
+                <PulseDot isActive={isUrgentCountdown} />
+              </View>
+
+              <Text style={styles.digitalCountdown}>{countdownInfo.text}</Text>
+              <Text style={styles.nextPrayerTime}>Masuk pukul {schedule.nextPrayerTime}</Text>
+
+              <View style={styles.prayerProgressTrack}>
+                <View style={[styles.prayerProgressFill, { width: `${prayerProgressPercentage}%` }]} />
+              </View>
+            </>
+          )}
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Pengingat Ibadah</Text>
-          <View style={styles.moreWrap}>
-            <Text style={styles.moreText}>Lebih Banyak</Text>
-            <MaterialIcons name="arrow-forward" size={22} color="#007322" />
+        <View style={styles.streakSection}>
+          <View style={styles.streakSummary}>
+            <Text style={styles.streakIcon}>🔥</Text>
+            <View>
+              <Text style={styles.streakNumber}>{streak}</Text>
+              <Text style={styles.streakLabel}>hari beruntun</Text>
+            </View>
+          </View>
+          <View style={styles.weekDotsRow}>
+            {Array.from({ length: 7 }).map((_, index) => {
+              const isToday = index === 6;
+              const isComplete = index >= 7 - Math.min(streak, 7);
+
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.weekDot,
+                    isComplete && styles.weekDotComplete,
+                    isToday && styles.weekDotToday,
+                  ]}
+                />
+              );
+            })}
+          </View>
+
+          <View style={styles.todayProgressHeader}>
+            <Text style={styles.todayProgressText}>
+              {dailyProgress.checked} dari {dailyProgress.total} sholat
+            </Text>
+            <Text style={styles.todayProgressPercent}>{Math.round(progressPercentage)}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
           </View>
         </View>
 
@@ -364,28 +424,28 @@ export default function HomeScreen() {
           <PrayerListSkeleton />
         ) : (
           <>
-            <View style={styles.progressWrap}>
-              <Text style={styles.progressText}>
-                {dailyProgress.checked}/{dailyProgress.total} sholat hari ini
-              </Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-              </View>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Jadwal Hari Ini</Text>
+              <Text style={styles.sectionAction}>5 waktu</Text>
             </View>
 
-            <View style={styles.listWrap}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.prayerHorizontalContent}>
               {schedule.prayers.map((item) => (
                 <PrayerReminderCard
                   key={item.key}
+                  prayerKey={item.key}
                   name={item.name}
                   time={item.time}
                   icon={prayerIcons[item.key]}
-                  isHighlighted={item.name === schedule.nextPrayerName}
+                  status={getPrayerStatus(item, schedule.nextPrayerName)}
                   isChecked={Boolean(prayerChecklist[item.name])}
                   onToggle={() => void handleTogglePrayer(item.name)}
                 />
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
       </ScrollView>
@@ -448,6 +508,117 @@ function getMillisecondsUntilNextMidnight() {
   return nextMidnight.getTime() - now.getTime();
 }
 
+function PulseDot({ isActive }: { isActive: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!isActive) {
+      scale.setValue(1);
+      return;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.35,
+          duration: 720,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 720,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [isActive, scale]);
+
+  return (
+    <Animated.View style={[styles.pulseDotOuter, { transform: [{ scale }] }]}>
+      <View style={styles.pulseDotInner} />
+    </Animated.View>
+  );
+}
+
+function clonePrayerIcon(prayerKey: PrayerScheduleItem['key'], color: string) {
+  const iconName: Record<PrayerScheduleItem['key'], keyof typeof MaterialCommunityIcons.glyphMap> = {
+    fajr: 'weather-sunset-up',
+    dhuhr: 'white-balance-sunny',
+    asr: 'weather-partly-cloudy',
+    maghrib: 'weather-night-partly-cloudy',
+    isha: 'moon-waning-crescent',
+  };
+
+  return <MaterialCommunityIcons name={iconName[prayerKey]} size={24} color={color} />;
+}
+
+function getCountdownInfo(schedule: ReturnType<typeof getPrayerSchedule>) {
+  const now = new Date();
+  const targetDate = createPrayerDate(schedule.nextPrayerTime, now);
+
+  if (targetDate <= now) {
+    targetDate.setDate(targetDate.getDate() + 1);
+  }
+
+  const totalSeconds = Math.max(Math.floor((targetDate.getTime() - now.getTime()) / 1_000), 0);
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return {
+    totalMinutes: Math.floor(totalSeconds / 60),
+    text: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+  };
+}
+
+function getPrayerWindowProgress(prayers: PrayerScheduleItem[], nextPrayerName: string) {
+  const now = new Date();
+  const nextPrayer = prayers.find((prayer) => prayer.name === nextPrayerName) ?? prayers[0];
+  const nextIndex = prayers.findIndex((prayer) => prayer.key === nextPrayer.key);
+  const previousPrayer = prayers[nextIndex - 1] ?? prayers[prayers.length - 1];
+  const nextDate = createPrayerDate(nextPrayer.time, now);
+  const previousDate = createPrayerDate(previousPrayer.time, now);
+
+  if (nextDate <= now) {
+    nextDate.setDate(nextDate.getDate() + 1);
+  }
+
+  if (previousDate >= nextDate) {
+    previousDate.setDate(previousDate.getDate() - 1);
+  }
+
+  const totalWindow = nextDate.getTime() - previousDate.getTime();
+  const elapsed = now.getTime() - previousDate.getTime();
+
+  return Math.min(Math.max((elapsed / totalWindow) * 100, 0), 100);
+}
+
+function getPrayerStatus(item: PrayerScheduleItem, nextPrayerName: string): 'past' | 'next' | 'upcoming' {
+  const now = new Date();
+  const prayerDate = createPrayerDate(item.time, now);
+
+  if (item.name === nextPrayerName && prayerDate > now) {
+    return 'next';
+  }
+
+  return prayerDate < now ? 'past' : 'upcoming';
+}
+
+function createPrayerDate(time: string, baseDate: Date) {
+  const [hourRaw, minuteRaw] = time.split(':');
+  const date = new Date(baseDate);
+
+  date.setHours(Number(hourRaw) || 0, Number(minuteRaw) || 0, 0, 0);
+
+  return date;
+}
+
 function HeroScheduleSkeleton() {
   return (
     <View style={styles.heroSkeletonWrap}>
@@ -460,7 +631,10 @@ function HeroScheduleSkeleton() {
 
 function PrayerListSkeleton() {
   return (
-    <View style={styles.listWrap}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.prayerHorizontalContent}>
       {Array.from({ length: 5 }).map((_, index) => (
         <View key={index} style={styles.prayerSkeletonCard}>
           <View style={styles.prayerSkeletonLeft}>
@@ -473,23 +647,39 @@ function PrayerListSkeleton() {
           <SkeletonBox width={72} height={28} borderRadius={12} />
         </View>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#E7F0DE',
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#E7F0DE',
+    backgroundColor: colors.background,
   },
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 28,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: 100,
+  },
+  fixedHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  headerCopy: {
+    flex: 1,
   },
   appTitle: {
     color: '#007322',
@@ -505,14 +695,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   greeting: {
-    color: '#2F3334',
-    fontSize: 16,
-    lineHeight: 28,
+    color: '#FFFFFF',
+    fontSize: typography.fontSizeLG,
+    lineHeight: typography.fontSizeLG * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightSemiBold,
   },
   hijriDate: {
-    color: '#5B6061',
-    fontSize: 16,
-    lineHeight: 28,
+    color: colors.accent,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightBold,
+    marginTop: spacing.xs,
   },
   overviewRow: {
     flexDirection: 'row',
@@ -525,11 +718,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateTitle: {
-    color: '#2F3334',
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '800',
-    marginBottom: 6,
+    color: '#ECF7EE',
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightMedium,
+    marginTop: spacing.xs,
   },
   locationRow: {
     flexDirection: 'row',
@@ -545,9 +738,22 @@ const styles = StyleSheet.create({
   },
   locationText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 24,
-    maxWidth: 180,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightBold,
+    maxWidth: 130,
+  },
+  locationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    maxWidth: 178,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   locationErrorCard: {
     backgroundColor: '#FFF7D6',
@@ -639,7 +845,77 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroSkeletonBox: {
-    backgroundColor: '#D9F7DF',
+    backgroundColor: colors.surfaceSecondary,
+  },
+  countdownCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    marginTop: -spacing.xxl,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.md,
+  },
+  countdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  countdownLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightSemiBold,
+  },
+  nextPrayerName: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSizeXXL,
+    lineHeight: typography.fontSizeXXL * typography.lineHeightTight,
+    fontWeight: typography.fontWeightExtraBold,
+    marginTop: spacing.xs,
+  },
+  pulseDotOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pulseDotInner: {
+    width: 9,
+    height: 9,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  digitalCountdown: {
+    color: colors.primary,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: typography.fontWeightExtraBold,
+    letterSpacing: 0,
+    marginTop: spacing.lg,
+  },
+  nextPrayerTime: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightMedium,
+    marginTop: spacing.xs,
+  },
+  prayerProgressTrack: {
+    height: 5,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceSecondary,
+    overflow: 'hidden',
+    marginTop: spacing.lg,
+  },
+  prayerProgressFill: {
+    height: '100%',
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
   },
   heroTitle: {
     color: '#FFFFFF',
@@ -669,12 +945,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: '700',
+    color: colors.textPrimary,
+    fontSize: typography.fontSizeLG,
+    lineHeight: typography.fontSizeLG * typography.lineHeightTight,
+    fontWeight: typography.fontWeightExtraBold,
+  },
+  sectionAction: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightBold,
   },
   moreWrap: {
     flexDirection: 'row',
@@ -698,55 +981,126 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 6,
-    borderRadius: 999,
-    backgroundColor: '#C8D7BE',
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceSecondary,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#008C3A',
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
   },
   listWrap: {
-    gap: 10,
+    gap: spacing.md,
+  },
+  streakSection: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  streakSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  streakIcon: {
+    fontSize: 30,
+    lineHeight: 36,
+  },
+  streakNumber: {
+    color: colors.textPrimary,
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: typography.fontWeightExtraBold,
+  },
+  streakLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightSemiBold,
+  },
+  weekDotsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  weekDot: {
+    width: 11,
+    height: 11,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  weekDotComplete: {
+    backgroundColor: colors.primary,
+  },
+  weekDotToday: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  todayProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  todayProgressText: {
+    color: colors.textPrimary,
+    fontSize: typography.fontSizeMD,
+    lineHeight: typography.fontSizeMD * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightBold,
+  },
+  todayProgressPercent: {
+    color: colors.primary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightExtraBold,
+  },
+  prayerHorizontalContent: {
+    gap: spacing.md,
+    paddingRight: spacing.lg,
+    paddingBottom: spacing.xs,
   },
   prayerSkeletonCard: {
-    minHeight: 80,
-    borderRadius: 24,
-    backgroundColor: '#F5FAEF',
+    minHeight: 142,
+    width: 126,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#D7E6CB',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: 'row',
+    borderColor: colors.border,
+    padding: spacing.md,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   prayerSkeletonLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    gap: spacing.md,
   },
   prayerSkeletonText: {
-    gap: 9,
-    flex: 1,
+    gap: spacing.sm,
+    alignItems: 'center',
   },
   prayerCard: {
-    minHeight: 80,
-    borderRadius: 24,
-    backgroundColor: '#4CB15F',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: 'row',
+    width: 126,
+    minHeight: 154,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  prayerCardHighlighted: {
-    backgroundColor: '#008C3A',
-    borderColor: '#F6D365',
+  prayerCardActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    ...shadows.lg,
+  },
+  prayerCardPast: {
+    opacity: 0.5,
   },
   prayerInfo: {
     flexDirection: 'row',
@@ -754,27 +1108,43 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   prayerIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 999,
-    backgroundColor: '#008C3A',
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  prayerIconWrapActive: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   prayerTextBlock: {
     justifyContent: 'center',
     gap: 5,
   },
   prayerName: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    lineHeight: 24,
-    fontWeight: '700',
+    color: colors.textPrimary,
+    fontSize: typography.fontSizeMD,
+    lineHeight: typography.fontSizeMD * typography.lineHeightTight,
+    fontWeight: typography.fontWeightExtraBold,
+    textAlign: 'center',
+  },
+  prayerArabicName: {
+    color: colors.textSecondary,
+    fontSize: typography.fontSizeSM,
+    lineHeight: typography.fontSizeSM * typography.lineHeightNormal,
+    fontWeight: typography.fontWeightBold,
+    textAlign: 'center',
   },
   prayerTime: {
-    color: '#E7F4E2',
-    fontSize: 16,
-    lineHeight: 20,
+    color: colors.primary,
+    fontSize: typography.fontSizeXL,
+    lineHeight: typography.fontSizeXL * typography.lineHeightTight,
+    fontWeight: typography.fontWeightExtraBold,
+    textAlign: 'center',
+  },
+  prayerCardTextActive: {
+    color: '#FFFFFF',
   },
   prayerActions: {
     flexDirection: 'row',
@@ -782,18 +1152,17 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   checkButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  checkButtonActiveCard: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
   checkButtonChecked: {
-    backgroundColor: '#007322',
-    borderColor: '#E7F4E2',
+    backgroundColor: colors.primaryLight,
   },
   modalBackdrop: {
     flex: 1,

@@ -2,6 +2,7 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { WidgetPreview } from 'react-native-android-widget';
 import {
   Alert,
   FlatList,
@@ -35,6 +36,7 @@ import {
   type FastingReminderSettings,
 } from '@/services/PreferenceService';
 import { PuasaReminderService } from '@/services/PuasaReminderService';
+import { updateAllHomeWidgets } from '@/services/WidgetUpdateService';
 import { Toast } from '@/shared/components/ui/Toast';
 import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
 import {
@@ -45,6 +47,12 @@ import {
   searchIndonesiaCities,
 } from '@/shared/utils/location';
 import { getPrayerSchedule } from '@/shared/utils/prayer';
+import {
+  getDefaultShalatWidgetData,
+  ShalatWidget,
+  type ShalatWidgetData,
+} from '@/widgets/ShalatWidget';
+import { getShalatWidgetData } from '@/widgets/shalatWidgetData';
 
 const reminderOptions = [5, 10, 15, 30];
 const quranFontOptions = [26, 30, 34, 38, 42] as const;
@@ -83,6 +91,9 @@ export default function SettingsScreen() {
   const [cityQuery, setCityQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const [widgetPreviewData, setWidgetPreviewData] = useState<ShalatWidgetData>(
+    getDefaultShalatWidgetData()
+  );
 
   const loadPreferences = useCallback(async () => {
     const [
@@ -90,11 +101,13 @@ export default function SettingsScreen() {
       storedNotificationSettings,
       storedFastingReminderSettings,
       selectedCityCode,
+      shalatWidgetData,
     ] = await Promise.all([
       getAppPreferences(),
       getPrayerNotificationSettings(),
       getFastingReminderSettings(),
       getSelectedCityCode(),
+      getShalatWidgetData(),
     ]);
 
     setPreferences(storedPreferences);
@@ -103,6 +116,7 @@ export default function SettingsScreen() {
     setSelectedCity(
       selectedCityCode ? findCityByCode(selectedCityCode) ?? defaultIndonesiaCity : defaultIndonesiaCity
     );
+    setWidgetPreviewData(shalatWidgetData);
   }, []);
 
   useEffect(() => {
@@ -114,11 +128,13 @@ export default function SettingsScreen() {
         storedNotificationSettings,
         storedFastingReminderSettings,
         selectedCityCode,
+        shalatWidgetData,
       ] = await Promise.all([
         getAppPreferences(),
         getPrayerNotificationSettings(),
         getFastingReminderSettings(),
         getSelectedCityCode(),
+        getShalatWidgetData(),
       ]);
 
       if (!isMounted) {
@@ -129,6 +145,7 @@ export default function SettingsScreen() {
       setNotificationSettings(storedNotificationSettings);
       setFastingReminderSettingsState(storedFastingReminderSettings);
       setSelectedCity(selectedCityCode ? findCityByCode(selectedCityCode) ?? defaultIndonesiaCity : defaultIndonesiaCity);
+      setWidgetPreviewData(shalatWidgetData);
     }
 
     void loadInitialPreferences();
@@ -160,6 +177,8 @@ export default function SettingsScreen() {
   ) {
     setPreferences(nextPreferences);
     await setAppPreferences(nextPreferences);
+    setWidgetPreviewData(await getShalatWidgetData());
+    await updateAllHomeWidgets();
 
     if (options?.shouldRescheduleNotifications) {
       await reschedulePrayerNotifications(notificationSettings, selectedCity, nextPreferences);
@@ -188,6 +207,8 @@ export default function SettingsScreen() {
     setCityQuery('');
     await persistSelectedCityCode(city.code);
     await reschedulePrayerNotifications(notificationSettings, city, preferences);
+    setWidgetPreviewData(await getShalatWidgetData());
+    await updateAllHomeWidgets();
     showToast(`Kota diperbarui ke ${getLocationLabel(city)}`);
   }
 
@@ -245,6 +266,22 @@ export default function SettingsScreen() {
                   }
                 />
               ))}
+            </View>
+          </View>
+        </Section>
+
+        <Section title="Widget Preview">
+          <View style={styles.optionBlock}>
+            <Text style={styles.settingTitle}>Preview Widget Android</Text>
+            <Text style={styles.settingDescription}>
+              Tampilan contoh widget yang akan muncul di home screen Android.
+            </Text>
+            <View style={styles.widgetPreviewContainer}>
+              <WidgetPreview
+                renderWidget={() => <ShalatWidget data={widgetPreviewData} />}
+                width={320}
+                height={200}
+              />
             </View>
           </View>
         </Section>
@@ -671,6 +708,17 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 10,
+  },
+  widgetPreviewContainer: {
+    marginTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D7E6CB',
+    backgroundColor: '#EDF6E6',
+    paddingVertical: 18,
+    overflow: 'hidden',
   },
   optionButton: {
     minHeight: 38,

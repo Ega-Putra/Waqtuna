@@ -1,35 +1,48 @@
-import { registerWidgetTaskHandler } from 'react-native-android-widget';
+import React from 'react';
+import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { togglePrayer } from '@/services/PrayerChecklistService';
-import {
-  renderChecklistWidget,
-  renderDailyPrayerWidget,
-  renderNextPrayerWidget,
-} from '@/widgets/PrayerWidgets';
-import { WidgetClickActions, WidgetNames } from '@/widgets/widgetConstants';
 
-registerWidgetTaskHandler(
-  async ({ widgetInfo, widgetAction, clickAction, clickActionData, renderWidget }) => {
-    if (widgetAction === 'WIDGET_CLICK' && clickAction === WidgetClickActions.togglePrayer) {
-      const prayerName = clickActionData?.prayerName;
+import { ShalatWidget } from './ShalatWidget';
+import { getShalatWidgetData } from './shalatWidgetData';
 
-      if (typeof prayerName === 'string') {
-        await togglePrayer(new Date(), prayerName);
-      }
-    }
+const nameToWidget = {
+  Hello: ShalatWidget,
+  Shalat: ShalatWidget,
+};
 
-    if (widgetInfo.widgetName === WidgetNames.nextPrayer) {
-      renderWidget(await renderNextPrayerWidget());
-      return;
-    }
+async function renderCurrentWidget(props: WidgetTaskHandlerProps) {
+  const Widget = nameToWidget[props.widgetInfo.widgetName as keyof typeof nameToWidget];
 
-    if (widgetInfo.widgetName === WidgetNames.dailyPrayer) {
-      renderWidget(await renderDailyPrayerWidget());
-      return;
-    }
-
-    if (widgetInfo.widgetName === WidgetNames.checklist) {
-      renderWidget(await renderChecklistWidget());
-    }
+  if (!Widget) {
+    return;
   }
-);
+
+  const data = await getShalatWidgetData();
+  props.renderWidget(<Widget data={data} />);
+}
+
+export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
+  switch (props.widgetAction) {
+    case 'WIDGET_ADDED':
+    case 'WIDGET_UPDATE':
+    case 'WIDGET_RESIZED':
+      await renderCurrentWidget(props);
+      break;
+
+    case 'WIDGET_CLICK':
+      if (
+        props.clickAction === 'TOGGLE_PRAYER_CHECKLIST' &&
+        typeof props.clickActionData?.prayerName === 'string'
+      ) {
+        await togglePrayer(new Date(), props.clickActionData.prayerName);
+      }
+
+      await renderCurrentWidget(props);
+      break;
+
+    case 'WIDGET_DELETED':
+    default:
+      break;
+  }
+}

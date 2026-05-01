@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.waqtuna.app"
     },
     "android": {
       "package": "com.waqtuna.app",
@@ -43,38 +44,21 @@
       [
         "react-native-android-widget",
         {
+          "fonts": [
+            "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf",
+            "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf",
+            "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf"
+          ],
           "widgets": [
             {
-              "name": "NextPrayerWidget",
-              "label": "Waktu Sholat Berikutnya",
-              "description": "Waktu sholat berikutnya dan hitung mundur.",
-              "minWidth": "110dp",
-              "minHeight": "40dp",
-              "targetCellWidth": 2,
-              "targetCellHeight": 1,
-              "resizeMode": "none",
-              "updatePeriodMillis": 1800000
-            },
-            {
-              "name": "DailyPrayerWidget",
-              "label": "Jadwal Sholat Harian",
-              "description": "Jadwal lima waktu sholat hari ini.",
-              "minWidth": "250dp",
-              "minHeight": "110dp",
-              "targetCellWidth": 4,
+              "name": "Shalat",
+              "label": "Waqtuna Shalat Widget",
+              "minWidth": "320dp",
+              "minHeight": "120dp",
+              "targetCellWidth": 5,
               "targetCellHeight": 2,
-              "resizeMode": "none",
-              "updatePeriodMillis": 1800000
-            },
-            {
-              "name": "ChecklistWidget",
-              "label": "Checklist Sholat",
-              "description": "Checklist sholat harian cepat.",
-              "minWidth": "110dp",
-              "minHeight": "110dp",
-              "targetCellWidth": 2,
-              "targetCellHeight": 2,
-              "resizeMode": "none",
+              "description": "Ringkasan waktu sholat dan checklist harian",
+              "previewImage": "./assets/images/icon.png",
               "updatePeriodMillis": 1800000
             }
           ]

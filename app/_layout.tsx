@@ -4,14 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { getOnboardingCompleted } from '@/services/PreferenceService';
-import { PuasaReminderService } from '@/services/PuasaReminderService';
-import {
-  updateAllHomeWidgets,
-  updateDailyPrayerWidget,
-  updateNextPrayerWidget,
-} from '@/services/WidgetUpdateService';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -21,33 +15,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
-
-  useEffect(() => {
-    void PuasaReminderService.scheduleAll();
-    void updateAllHomeWidgets();
-
-    const minuteRefresh = setInterval(() => {
-      void updateNextPrayerWidget();
-    }, 60_000);
-    let midnightRefresh: ReturnType<typeof setTimeout> | null = null;
-
-    function scheduleMidnightRefresh() {
-      midnightRefresh = setTimeout(() => {
-        void updateDailyPrayerWidget();
-        scheduleMidnightRefresh();
-      }, getMillisecondsUntilNextMidnight());
-    }
-
-    scheduleMidnightRefresh();
-
-    return () => {
-      clearInterval(minuteRefresh);
-
-      if (midnightRefresh) {
-        clearTimeout(midnightRefresh);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,14 +61,4 @@ export default function RootLayout() {
       <StatusBar style="auto" />
     </ThemeProvider>
   );
-}
-
-function getMillisecondsUntilNextMidnight() {
-  const now = new Date();
-  const nextMidnight = new Date(now);
-
-  nextMidnight.setDate(now.getDate() + 1);
-  nextMidnight.setHours(0, 0, 5, 0);
-
-  return nextMidnight.getTime() - now.getTime();
 }

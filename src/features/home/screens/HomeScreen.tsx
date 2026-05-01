@@ -32,10 +32,6 @@ import {
   getAppPreferences,
   type AppPreferences,
 } from '@/services/PreferenceService';
-import {
-  updateAllHomeWidgets,
-  updateChecklistWidget,
-} from '@/services/WidgetUpdateService';
 import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
 import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
 import {
@@ -282,6 +278,7 @@ export default function HomeScreen() {
               }
             )
           );
+          await refreshChecklistState();
           setLocationError(null);
         } catch {
           if (!isActive) {
@@ -298,7 +295,7 @@ export default function HomeScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [refreshChecklistState])
   );
 
   useEffect(() => {
@@ -436,7 +433,6 @@ export default function HomeScreen() {
     setCityQuery('');
     setLocationError(null);
     await persistSelectedCityCode(city.code);
-    await updateAllHomeWidgets();
   }
 
   async function handleTogglePrayer(prayerName: string) {
@@ -450,7 +446,6 @@ export default function HomeScreen() {
     setPrayerChecklist(nextChecklist);
     setDailyProgress(progress);
     setStreak(currentStreak);
-    await updateChecklistWidget();
   }
 
   async function handleTogglePrayerNotification(prayerKey: PrayerScheduleItem['key']) {

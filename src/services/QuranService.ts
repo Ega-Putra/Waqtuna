@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createHafs } from 'quran-meta';
+import { createHafs, type Juz as QuranMetaJuz } from 'quran-meta';
 
 import type { Juz, QuranCacheNotice, SearchResult, Surah, SurahDetail } from '@/shared/types/quran';
 
@@ -228,7 +228,7 @@ function mapJuzList(response: QuranJuzResponse): Juz[] {
 
   return Array.from({ length: 30 }, (_, index) => {
     const juzNumber = index + 1;
-    const juzMeta = hafsMeta.getJuzMeta(juzNumber);
+    const juzMeta = hafsMeta.getJuzMeta(juzNumber as QuranMetaJuz);
     const fallbackJuz = fallbackMappings.find((item) => item.juz_number === juzNumber);
     const [[firstSurahId, firstVerse], [lastSurahId, lastVerse]] = [
       juzMeta.first,

@@ -31,8 +31,6 @@ export async function getShalatWidgetData(date = new Date()): Promise<ShalatWidg
       },
       date,
       {
-        calculationMethod: preferences.calculationMethod,
-        asrMadhab: preferences.asrMadhab,
         clockFormat: preferences.clockFormat,
       }
     );

@@ -31,8 +31,6 @@ import {
   setFastingReminderSettings,
   setPrayerNotificationSettings,
   type AppPreferences,
-  type AsrMadhabPreference,
-  type CalculationMethodPreference,
   type FastingReminderSettings,
 } from '@/services/PreferenceService';
 import { PuasaReminderService } from '@/services/PuasaReminderService';
@@ -63,19 +61,6 @@ const prayerOptions: { key: PrayerNotificationKey; label: string }[] = [
   { key: 'ashar', label: 'Ashar' },
   { key: 'maghrib', label: 'Maghrib' },
   { key: 'isya', label: 'Isya' },
-];
-
-const calculationOptions: { value: CalculationMethodPreference; label: string }[] = [
-  { value: 'kemenag', label: 'Kemenag RI' },
-  { value: 'muslimWorldLeague', label: 'Muslim World League' },
-  { value: 'isna', label: 'ISNA' },
-  { value: 'egypt', label: 'Egypt' },
-  { value: 'karachi', label: 'Karachi' },
-];
-
-const madhabOptions: { value: AsrMadhabPreference; label: string }[] = [
-  { value: 'shafi', label: "Syafi'i" },
-  { value: 'hanafi', label: 'Hanafi' },
 ];
 
 export default function SettingsScreen() {
@@ -168,25 +153,11 @@ export default function SettingsScreen() {
     setIsToastVisible(true);
   }
 
-  async function persistPreferences(
-    nextPreferences: AppPreferences,
-    options?: {
-      shouldRescheduleNotifications?: boolean;
-      successToast?: string;
-    }
-  ) {
+  async function persistPreferences(nextPreferences: AppPreferences) {
     setPreferences(nextPreferences);
     await setAppPreferences(nextPreferences);
     setWidgetPreviewData(await getShalatWidgetData());
     await updateAllHomeWidgets();
-
-    if (options?.shouldRescheduleNotifications) {
-      await reschedulePrayerNotifications(notificationSettings, selectedCity, nextPreferences);
-    }
-
-    if (options?.successToast) {
-      showToast(options.successToast);
-    }
   }
 
   async function persistNotificationSettings(nextSettings: typeof notificationSettings) {
@@ -356,66 +327,6 @@ export default function SettingsScreen() {
               })
             }
           />
-        </Section>
-
-        <Section title="Perhitungan">
-          <View style={styles.optionBlock}>
-            <Text style={styles.settingTitle}>Metode Kalkulasi</Text>
-            <View style={styles.optionGrid}>
-              {calculationOptions.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  label={option.label}
-                  isSelected={preferences.calculationMethod === option.value}
-                  onPress={() => {
-                    if (preferences.calculationMethod === option.value) {
-                      return;
-                    }
-
-                    void persistPreferences(
-                      {
-                        ...preferences,
-                        calculationMethod: option.value,
-                      },
-                      {
-                        shouldRescheduleNotifications: true,
-                        successToast: 'Jadwal sholat diperbarui',
-                      }
-                    );
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.optionBlock}>
-            <Text style={styles.settingTitle}>Madhab Ashar</Text>
-            <View style={styles.optionGrid}>
-              {madhabOptions.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  label={option.label}
-                  isSelected={preferences.asrMadhab === option.value}
-                  onPress={() => {
-                    if (preferences.asrMadhab === option.value) {
-                      return;
-                    }
-
-                    void persistPreferences(
-                      {
-                        ...preferences,
-                        asrMadhab: option.value,
-                      },
-                      {
-                        shouldRescheduleNotifications: true,
-                        successToast: 'Jadwal sholat diperbarui',
-                      }
-                    );
-                  }}
-                />
-              ))}
-            </View>
-          </View>
         </Section>
 
         <Section title="Lokasi & Izin">
@@ -601,10 +512,7 @@ async function reschedulePrayerNotifications(
       longitude: city.longitude,
     },
     new Date(),
-    {
-      calculationMethod: prefs.calculationMethod,
-      asrMadhab: prefs.asrMadhab,
-    }
+    { clockFormat: prefs.clockFormat }
   );
 
   await rescheduleAll(schedule.prayers, settings);

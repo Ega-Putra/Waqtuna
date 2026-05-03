@@ -25,7 +25,7 @@ export type PrayerSchedule = {
 };
 
 type PrayerSchedulePreferences = Partial<
-  Pick<AppPreferences, 'calculationMethod' | 'asrMadhab' | 'clockFormat'>
+  Pick<AppPreferences, 'clockFormat'>
 >;
 
 export function getPrayerSchedule(
@@ -33,8 +33,7 @@ export function getPrayerSchedule(
   date = new Date(),
   preferences?: PrayerSchedulePreferences
 ): PrayerSchedule {
-  const params = getCalculationParameters(preferences?.calculationMethod);
-  params.madhab = preferences?.asrMadhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi;
+  const params = getKemenagCalculationParameters();
 
   const prayerTimes = new PrayerTimes(
     new Coordinates(coordinates.latitude, coordinates.longitude),
@@ -62,23 +61,12 @@ export function getPrayerSchedule(
   };
 }
 
-function getCalculationParameters(
-  method: PrayerSchedulePreferences['calculationMethod'] | undefined
-) {
-  switch (method) {
-    case 'muslimWorldLeague':
-      return CalculationMethod.MuslimWorldLeague();
-    case 'isna':
-      return CalculationMethod.NorthAmerica();
-    case 'egypt':
-      return CalculationMethod.Egyptian();
-    case 'karachi':
-      return CalculationMethod.Karachi();
-    case 'kemenag':
-    default:
-      // Adhan has no dedicated Kemenag preset; Singapore is closest for Indonesia.
-      return CalculationMethod.Singapore();
-  }
+function getKemenagCalculationParameters() {
+  // Adhan has no dedicated Kemenag preset; Singapore is closest for Indonesia.
+  const params = CalculationMethod.Singapore();
+  params.madhab = Madhab.Shafi;
+
+  return params;
 }
 
 function createPrayerItem(
@@ -113,9 +101,7 @@ function resolveNextPrayer(
     };
   }
 
-  const tomorrowParams = getCalculationParameters(preferences?.calculationMethod);
-  tomorrowParams.madhab =
-    preferences?.asrMadhab === 'hanafi' ? Madhab.Hanafi : Madhab.Shafi;
+  const tomorrowParams = getKemenagCalculationParameters();
 
   const tomorrowPrayerTimes = new PrayerTimes(
     new Coordinates(coordinates.latitude, coordinates.longitude),

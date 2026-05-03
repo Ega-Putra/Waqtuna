@@ -16,13 +16,9 @@ export const PreferenceStorageKeys = {
 } as const;
 
 export type ClockFormat = '12h' | '24h';
-export type CalculationMethodPreference = 'kemenag' | 'muslimWorldLeague' | 'isna' | 'egypt' | 'karachi';
-export type AsrMadhabPreference = 'shafi' | 'hanafi';
 
 export type AppPreferences = {
   clockFormat: ClockFormat;
-  calculationMethod: CalculationMethodPreference;
-  asrMadhab: AsrMadhabPreference;
   quranArabicFontSize: 26 | 30 | 34 | 38 | 42;
 };
 
@@ -45,8 +41,6 @@ export const defaultPrayerNotificationSettings: PrayerNotificationSettings = {
 
 export const defaultAppPreferences: AppPreferences = {
   clockFormat: '24h',
-  calculationMethod: 'kemenag',
-  asrMadhab: 'shafi',
   quranArabicFontSize: 34,
 };
 
@@ -167,12 +161,6 @@ function parseAppPreferences(rawValue: string | null): AppPreferences {
       clockFormat: isClockFormat(parsed.clockFormat)
         ? parsed.clockFormat
         : defaultAppPreferences.clockFormat,
-      calculationMethod: isCalculationMethod(parsed.calculationMethod)
-        ? parsed.calculationMethod
-        : defaultAppPreferences.calculationMethod,
-      asrMadhab: isAsrMadhab(parsed.asrMadhab)
-        ? parsed.asrMadhab
-        : defaultAppPreferences.asrMadhab,
       quranArabicFontSize: isQuranArabicFontSize(parsed.quranArabicFontSize)
         ? parsed.quranArabicFontSize
         : defaultAppPreferences.quranArabicFontSize,
@@ -253,20 +241,6 @@ function sanitizeReminderMinutes(value: unknown) {
 
 function isClockFormat(value: unknown): value is ClockFormat {
   return value === '12h' || value === '24h';
-}
-
-function isCalculationMethod(value: unknown): value is CalculationMethodPreference {
-  return (
-    value === 'kemenag' ||
-    value === 'muslimWorldLeague' ||
-    value === 'isna' ||
-    value === 'egypt' ||
-    value === 'karachi'
-  );
-}
-
-function isAsrMadhab(value: unknown): value is AsrMadhabPreference {
-  return value === 'shafi' || value === 'hanafi';
 }
 
 function isQuranArabicFontSize(

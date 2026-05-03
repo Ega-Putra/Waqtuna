@@ -284,7 +284,7 @@ export function ShalatWidget({ data }: ShalatWidgetProps) {
               backgroundColor: data.isChecked ? '#DDF4E4' : '#FFFFFF',
               borderRadius: 100,
               borderWidth: 1,
-              borderColor: data.isChecked ? '#007322' : 'rgba(0,0,0,0.1)',
+              borderColor: data.isChecked ? '#007322' : '#0000001A',
               alignItems: 'center',
               justifyContent: 'center',
             }}

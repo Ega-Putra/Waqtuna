@@ -160,8 +160,6 @@ export default function HomeScreen() {
       },
       new Date(),
       {
-        calculationMethod: defaultAppPreferences.calculationMethod,
-        asrMadhab: defaultAppPreferences.asrMadhab,
         clockFormat: defaultAppPreferences.clockFormat,
       }
     )
@@ -204,8 +202,6 @@ export default function HomeScreen() {
             },
             new Date(),
             {
-              calculationMethod: storedPreferences.calculationMethod,
-              asrMadhab: storedPreferences.asrMadhab,
               clockFormat: storedPreferences.clockFormat,
             }
           )
@@ -226,8 +222,6 @@ export default function HomeScreen() {
             },
             new Date(),
             {
-              calculationMethod: defaultAppPreferences.calculationMethod,
-              asrMadhab: defaultAppPreferences.asrMadhab,
               clockFormat: defaultAppPreferences.clockFormat,
             }
           )
@@ -272,8 +266,6 @@ export default function HomeScreen() {
               },
               new Date(),
               {
-                calculationMethod: nextPreferences.calculationMethod,
-                asrMadhab: nextPreferences.asrMadhab,
                 clockFormat: nextPreferences.clockFormat,
               }
             )
@@ -308,8 +300,6 @@ export default function HomeScreen() {
           },
           new Date(),
           {
-            calculationMethod: preferences.calculationMethod,
-            asrMadhab: preferences.asrMadhab,
             clockFormat: preferences.clockFormat,
           }
         )
@@ -320,8 +310,6 @@ export default function HomeScreen() {
       clearInterval(interval);
     };
   }, [
-    preferences.asrMadhab,
-    preferences.calculationMethod,
     preferences.clockFormat,
     selectedCity,
   ]);
@@ -371,8 +359,6 @@ export default function HomeScreen() {
         },
         new Date(),
         {
-          calculationMethod: preferences.calculationMethod,
-          asrMadhab: preferences.asrMadhab,
           clockFormat: preferences.clockFormat,
         }
       );
@@ -405,8 +391,6 @@ export default function HomeScreen() {
     isBootstrapping,
     isNotificationSettingsLoading,
     notificationSettings,
-    preferences.asrMadhab,
-    preferences.calculationMethod,
     preferences.clockFormat,
     selectedCity,
   ]);
@@ -423,8 +407,6 @@ export default function HomeScreen() {
         },
         new Date(),
         {
-          calculationMethod: preferences.calculationMethod,
-          asrMadhab: preferences.asrMadhab,
           clockFormat: preferences.clockFormat,
         }
       )

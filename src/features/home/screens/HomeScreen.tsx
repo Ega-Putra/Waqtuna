@@ -4,6 +4,7 @@ import {
   MaterialIcons,
 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -136,6 +137,7 @@ function PrayerReminderRow({
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { gregorianDate, hijriDate } = getCalendarDateParts();
   const {
     settings: notificationSettings,
@@ -555,10 +557,14 @@ export default function HomeScreen() {
         <View style={styles.reminderSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Pengingat Ibadah</Text>
-            <View style={styles.moreAction}>
+            <Pressable
+              style={styles.moreAction}
+              onPress={() => router.push('/sunnah-prayers' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Buka daftar sholat sunnah">
               <Text style={styles.moreActionText}>Lebih Banyak</Text>
               <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
-            </View>
+            </Pressable>
           </View>
 
           {isBootstrapping ? (

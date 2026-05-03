@@ -3,6 +3,8 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import React from 'react';
 import { FlexWidget, IconWidget, TextWidget } from 'react-native-android-widget';
 
+import { WidgetClickActions } from './widgetConstants';
+
 export type ShalatWidgetData = {
   title: string;
   countdownText: string;
@@ -34,7 +36,7 @@ export function ShalatWidget({ data }: ShalatWidgetProps) {
 
   return (
     <FlexWidget
-      clickAction="OPEN_APP"
+      clickAction={WidgetClickActions.openApp}
       style={{
         width: 'match_parent',
         height: 'match_parent',
@@ -257,7 +259,7 @@ export function ShalatWidget({ data }: ShalatWidgetProps) {
           }}
         >
           <FlexWidget
-            clickAction="OPEN_APP"
+            clickAction={WidgetClickActions.reschedule}
             style={{
               width: 30,
               height: 30,
@@ -276,7 +278,7 @@ export function ShalatWidget({ data }: ShalatWidgetProps) {
           </FlexWidget>
 
           <FlexWidget
-            clickAction="TOGGLE_PRAYER_CHECKLIST"
+            clickAction={WidgetClickActions.togglePrayerChecklist}
             clickActionData={{ prayerName: data.prayerName }}
             style={{
               width: 30,

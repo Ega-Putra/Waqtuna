@@ -120,6 +120,49 @@ export async function rescheduleAll(
   return schedulePrayerNotifications(prayerTimes, settings);
 }
 
+export async function schedulePrayerReminderInFiveMinutes(
+  prayerName: string,
+  settings?: PrayerNotificationSettings
+): Promise<string | null> {
+  if (!settings?.isEnabled) {
+    return null;
+  }
+
+  const prayerKey = prayerNameToNotificationKey(prayerName);
+
+  if (!prayerKey || !settings.enabledPrayers[prayerKey]) {
+    return null;
+  }
+
+  const hasPermission = await requestPermission();
+
+  if (!hasPermission) {
+    return null;
+  }
+
+  await cancelPrayerSnoozeNotifications(prayerKey);
+
+  const triggerDate = new Date(Date.now() + 5 * 60_000);
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: `Pengingat ${prayerName}`,
+      body: `Waktu ${prayerName} sedang berlangsung. Jangan sampai terlewat.`,
+      sound: 'default',
+      data: {
+        category: 'prayer-snooze',
+        prayerKey,
+        prayerName,
+      },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: triggerDate,
+      channelId: PRAYER_NOTIFICATION_CHANNEL_ID,
+    },
+  });
+}
+
 export async function scheduleIslamicEventNotifications(
   events: IslamicCalendarEvent[]
 ): Promise<string[]> {
@@ -182,6 +225,21 @@ async function cancelIslamicEventNotifications() {
   );
 }
 
+async function cancelPrayerSnoozeNotifications(prayerKey: PrayerNotificationKey) {
+  const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+  const snoozedPrayerNotifications = scheduledNotifications.filter(
+    (notification) =>
+      notification.content.data?.category === 'prayer-snooze' &&
+      notification.content.data?.prayerKey === prayerKey
+  );
+
+  await Promise.all(
+    snoozedPrayerNotifications.map((notification) =>
+      Notifications.cancelScheduledNotificationAsync(notification.identifier)
+    )
+  );
+}
+
 async function ensureIslamicEventChannel() {
   if (Platform.OS !== 'android') {
     return;
@@ -207,6 +265,23 @@ function toNotificationKey(prayerKey: PrayerScheduleItem['key']): PrayerNotifica
       return 'maghrib';
     case 'isha':
       return 'isya';
+  }
+}
+
+function prayerNameToNotificationKey(prayerName: string): PrayerNotificationKey | null {
+  switch (prayerName.trim().toLowerCase()) {
+    case 'subuh':
+      return 'subuh';
+    case 'dzuhur':
+      return 'dzuhur';
+    case 'ashar':
+      return 'ashar';
+    case 'maghrib':
+      return 'maghrib';
+    case 'isya':
+      return 'isya';
+    default:
+      return null;
   }
 }
 

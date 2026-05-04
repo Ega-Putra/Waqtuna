@@ -286,6 +286,7 @@ export function ShalatWidget({ data }: ShalatWidgetProps) {
         >
           <FlexWidget
             clickAction={WidgetClickActions.reschedule}
+            clickActionData={{ prayerName: data.prayerName }}
             style={{
               width: 34,
               height: 34,

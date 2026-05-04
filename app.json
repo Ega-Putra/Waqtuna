@@ -32,10 +32,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/app-logo-monochrome.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#E7F0DE",
           "dark": {
             "backgroundColor": "#000000"
           }
@@ -55,7 +55,7 @@
               "label": "Waqtuna Shalat Widget",
               "minWidth": "320dp",
               "minHeight": "120dp",
-              "targetCellWidth": 4,
+              "targetCellWidth": 5,
               "targetCellHeight": 2,
               "description": "Ringkasan waktu sholat dan checklist harian",
               "previewImage": "./assets/images/widget-preview.png",
@@ -68,6 +68,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d1caaf96-1988-4595-925c-ac48b6901524"
+      }
+    },
+    "owner": "egaputra"
   }
 }

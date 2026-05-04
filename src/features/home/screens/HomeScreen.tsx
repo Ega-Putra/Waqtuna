@@ -149,7 +149,7 @@ function PrayerReminderRow({
           <MaterialIcons
             name="check"
             size={20}
-            color={isChecked ? colors.primary : '#97A6A0'}
+            color={isChecked ? colors.primary : 'rgba(255,255,255,0.7)'}
           />
         </Pressable>
       </View>
@@ -1522,15 +1522,15 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: radius.full,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   reminderCheckButtonChecked: {
-    backgroundColor: '#00813A',
-    borderColor: '#00813A',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   sunnahCheckButton: {
     width: 30,

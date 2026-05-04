@@ -2,7 +2,6 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { WidgetPreview } from 'react-native-android-widget';
 import {
   Alert,
   FlatList,
@@ -16,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { WidgetPreview } from 'react-native-android-widget';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { rescheduleAll, type PrayerNotificationKey } from '@/services/NotificationService';
@@ -356,6 +356,7 @@ export default function SettingsScreen() {
             <Text style={styles.secondaryButtonText}>Kelola Izin Notifikasi</Text>
           </Pressable>
         </Section>
+        <Text style={styles.footerText}>Waqtuna - Karya Ega & Radhit untuk Lomba MTQ</Text>
       </ScrollView>
 
       <Toast
@@ -767,5 +768,11 @@ const styles = StyleSheet.create({
   cityItemProvince: {
     color: '#5E636A',
     fontSize: 14,
+  },
+  footerText: {
+    textAlign: 'center',
+    marginBottom: 12,
+    fontSize: 12,
+    color: 'black',
   },
 });

@@ -37,6 +37,7 @@ import {
 } from '@/services/PreferenceService';
 import {
   sunnahPrayerDefinitions,
+  SunnahReminderService,
   type SunnahPrayerKey,
 } from '@/services/SunnahReminderService';
 import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
@@ -53,6 +54,8 @@ import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 const STREAK_DOT_COUNT = 8;
 const sunnahReminderStorageKey = 'sunnah:reminders';
+const sunnahEnabledStorageKey = 'sunnah:enabled';
+const sunnahChecklistStorageKeyPrefix = 'sunnah:checklist';
 
 type SunnahPrayerItem = {
   key: `sunnah-${SunnahPrayerKey}`;
@@ -154,9 +157,21 @@ function PrayerReminderRow({
   );
 }
 
-function SunnahReminderRow({ prayer }: { prayer: SunnahPrayerItem }) {
+function SunnahReminderRow({
+  prayer,
+  isChecked,
+  isNotificationEnabled,
+  onToggle,
+  onToggleNotification,
+}: {
+  prayer: SunnahPrayerItem;
+  isChecked: boolean;
+  isNotificationEnabled: boolean;
+  onToggle: () => void;
+  onToggleNotification: () => void;
+}) {
   return (
-    <View style={styles.sunnahReminderItem}>
+    <View style={[styles.sunnahReminderItem, isChecked && styles.sunnahReminderItemChecked]}>
       <View style={styles.reminderInfo}>
         <View style={styles.sunnahReminderIconWrap}>
           <MaterialCommunityIcons name="star-crescent" size={26} color={colors.primary} />
@@ -169,6 +184,38 @@ function SunnahReminderRow({ prayer }: { prayer: SunnahPrayerItem }) {
           </View>
           <Text style={styles.sunnahPrayerTime}>{prayer.time}</Text>
         </View>
+      </View>
+
+      <View style={styles.reminderActions}>
+        <Pressable
+          style={[
+            styles.sunnahNotificationButton,
+            isNotificationEnabled && styles.sunnahNotificationButtonActive,
+          ]}
+          onPress={onToggleNotification}
+          accessibilityRole="button"
+          accessibilityLabel={`Atur notifikasi sholat sunnah ${prayer.name}`}>
+          <MaterialCommunityIcons
+            name={isNotificationEnabled ? 'bell-ring-outline' : 'bell-off-outline'}
+            size={22}
+            color={isNotificationEnabled ? colors.primary : '#69736B'}
+          />
+        </Pressable>
+
+        <Pressable
+          style={[
+            styles.sunnahCheckButton,
+            isChecked && styles.sunnahCheckButtonChecked,
+          ]}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityLabel={`Tandai sholat sunnah ${prayer.name}`}>
+          <MaterialIcons
+            name="check"
+            size={20}
+            color={isChecked ? '#FFFFFF' : '#97A6A0'}
+          />
+        </Pressable>
       </View>
     </View>
   );
@@ -193,6 +240,8 @@ export default function HomeScreen() {
   const [cityQuery, setCityQuery] = useState('');
   const [preferences, setPreferences] = useState<AppPreferences>(defaultAppPreferences);
   const [enabledSunnahKeys, setEnabledSunnahKeys] = useState<SunnahPrayerKey[]>([]);
+  const [sunnahReminderKeys, setSunnahReminderKeys] = useState<SunnahPrayerKey[]>([]);
+  const [sunnahChecklist, setSunnahChecklist] = useState<Partial<Record<SunnahPrayerKey, boolean>>>({});
   const [schedule, setSchedule] = useState(() =>
     getPrayerSchedule(
       {
@@ -224,10 +273,18 @@ export default function HomeScreen() {
 
     async function loadInitialState() {
       try {
-        const [initialLocation, storedPreferences, storedSunnahKeys] = await Promise.all([
+        const [
+          initialLocation,
+          storedPreferences,
+          storedSunnahKeys,
+          storedSunnahReminderKeys,
+          storedSunnahChecklist,
+        ] = await Promise.all([
           getInitialLocationState(),
           getAppPreferences(),
           getStoredEnabledSunnahKeys(),
+          getStoredSunnahReminderKeys(),
+          getStoredSunnahChecklist(),
         ]);
 
         if (!isMounted) {
@@ -237,6 +294,8 @@ export default function HomeScreen() {
         setSelectedCity(initialLocation.city);
         setPreferences(storedPreferences);
         setEnabledSunnahKeys(storedSunnahKeys);
+        setSunnahReminderKeys(storedSunnahReminderKeys);
+        setSunnahChecklist(storedSunnahChecklist);
         setSchedule(
           getPrayerSchedule(
             {
@@ -258,6 +317,8 @@ export default function HomeScreen() {
         setSelectedCity(defaultIndonesiaCity);
         setPreferences(defaultAppPreferences);
         setEnabledSunnahKeys([]);
+        setSunnahReminderKeys([]);
+        setSunnahChecklist({});
         setSchedule(
           getPrayerSchedule(
             {
@@ -291,10 +352,18 @@ export default function HomeScreen() {
 
       async function syncOnFocus() {
         try {
-          const [nextLocation, nextPreferences, nextSunnahKeys] = await Promise.all([
+          const [
+            nextLocation,
+            nextPreferences,
+            nextSunnahKeys,
+            nextSunnahReminderKeys,
+            nextSunnahChecklist,
+          ] = await Promise.all([
             getInitialLocationState(),
             getAppPreferences(),
             getStoredEnabledSunnahKeys(),
+            getStoredSunnahReminderKeys(),
+            getStoredSunnahChecklist(),
           ]);
 
           if (!isActive) {
@@ -304,6 +373,8 @@ export default function HomeScreen() {
           setSelectedCity(nextLocation.city);
           setPreferences(nextPreferences);
           setEnabledSunnahKeys(nextSunnahKeys);
+          setSunnahReminderKeys(nextSunnahReminderKeys);
+          setSunnahChecklist(nextSunnahChecklist);
           setSchedule(
             getPrayerSchedule(
               {
@@ -367,6 +438,7 @@ export default function HomeScreen() {
     async function loadChecklist() {
       if (isActive) {
         await refreshChecklistState();
+        setSunnahChecklist(await getStoredSunnahChecklist());
       }
     }
 
@@ -486,6 +558,25 @@ export default function HomeScreen() {
     }
 
     await setPrayerEnabled(notificationKey, nextValue);
+  }
+
+  function handleToggleSunnahReminder(sunnahKey: SunnahPrayerKey) {
+    const nextReminderKeys = sunnahReminderKeys.includes(sunnahKey)
+      ? sunnahReminderKeys.filter((key) => key !== sunnahKey)
+      : [...sunnahReminderKeys, sunnahKey];
+
+    setSunnahReminderKeys(nextReminderKeys);
+    void persistAndScheduleSunnahReminders(nextReminderKeys, schedule);
+  }
+
+  function handleToggleSunnahChecklist(sunnahKey: SunnahPrayerKey) {
+    const nextChecklist = {
+      ...sunnahChecklist,
+      [sunnahKey]: !sunnahChecklist[sunnahKey],
+    };
+
+    setSunnahChecklist(nextChecklist);
+    void persistSunnahChecklist(nextChecklist);
   }
 
   const progressPercentage =
@@ -621,7 +712,16 @@ export default function HomeScreen() {
             <View style={styles.reminderList}>
               {reminderItems.map((item) => {
                 if (isSunnahReminderItem(item)) {
-                  return <SunnahReminderRow key={item.key} prayer={item} />;
+                  return (
+                    <SunnahReminderRow
+                      key={item.key}
+                      prayer={item}
+                      isChecked={Boolean(sunnahChecklist[item.sunnahKey])}
+                      isNotificationEnabled={sunnahReminderKeys.includes(item.sunnahKey)}
+                      onToggle={() => handleToggleSunnahChecklist(item.sunnahKey)}
+                      onToggleNotification={() => handleToggleSunnahReminder(item.sunnahKey)}
+                    />
+                  );
                 }
 
                 return (
@@ -708,31 +808,118 @@ function formatLocationLabel(city: IndonesiaCity) {
 }
 
 async function getStoredEnabledSunnahKeys(): Promise<SunnahPrayerKey[]> {
+  const rawValue = await AsyncStorage.getItem(sunnahEnabledStorageKey);
+
+  if (!rawValue) {
+    return getStoredSunnahReminderKeys();
+  }
+
+  return parseStoredSunnahKeys(rawValue);
+}
+
+async function getStoredSunnahReminderKeys(): Promise<SunnahPrayerKey[]> {
   const rawValue = await AsyncStorage.getItem(sunnahReminderStorageKey);
 
   if (!rawValue) {
     return [];
   }
 
+  return parseStoredSunnahKeys(rawValue);
+}
+
+function parseStoredSunnahKeys(rawValue: string): SunnahPrayerKey[] {
   try {
     const parsed = JSON.parse(rawValue) as unknown;
 
-    if (Array.isArray(parsed)) {
-      return parsed.filter(isSunnahPrayerKey);
-    }
-
-    if (parsed && typeof parsed === 'object') {
-      return Object.entries(parsed)
-        .filter((entry): entry is [SunnahPrayerKey, boolean] => (
-          isSunnahPrayerKey(entry[0]) && entry[1] === true
-        ))
-        .map(([key]) => key);
-    }
-
-    return [];
+    return getEnabledKeysFromParsedValue(parsed);
   } catch {
     return [];
   }
+}
+
+function getEnabledKeysFromParsedValue(parsed: unknown): SunnahPrayerKey[] {
+  if (Array.isArray(parsed)) {
+    return parsed.filter(isSunnahPrayerKey);
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    return Object.entries(parsed)
+      .filter((entry): entry is [SunnahPrayerKey, boolean] => (
+        isSunnahPrayerKey(entry[0]) && entry[1] === true
+      ))
+      .map(([key]) => key);
+  }
+
+  return [];
+}
+
+async function getStoredSunnahChecklist(): Promise<Partial<Record<SunnahPrayerKey, boolean>>> {
+  const rawValue = await AsyncStorage.getItem(getSunnahChecklistStorageKey());
+
+  if (!rawValue) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [SunnahPrayerKey, boolean] => (
+          isSunnahPrayerKey(entry[0]) && typeof entry[1] === 'boolean'
+        )
+      )
+    ) as Partial<Record<SunnahPrayerKey, boolean>>;
+  } catch {
+    return {};
+  }
+}
+
+async function persistSunnahChecklist(
+  checklist: Partial<Record<SunnahPrayerKey, boolean>>
+) {
+  try {
+    await AsyncStorage.setItem(getSunnahChecklistStorageKey(), JSON.stringify(checklist));
+  } catch (error) {
+    console.warn('Failed to persist sunnah prayer checklist', error);
+  }
+}
+
+async function persistAndScheduleSunnahReminders(
+  enabledKeys: SunnahPrayerKey[],
+  currentSchedule: ReturnType<typeof getPrayerSchedule>
+) {
+  try {
+    await AsyncStorage.setItem(
+      sunnahReminderStorageKey,
+      JSON.stringify(createSunnahReminderMap(enabledKeys))
+    );
+    await SunnahReminderService.scheduleAll(enabledKeys, currentSchedule);
+  } catch (error) {
+    console.warn('Failed to persist sunnah prayer reminders', error);
+  }
+}
+
+function createSunnahReminderMap(keys: SunnahPrayerKey[]) {
+  return Object.fromEntries(keys.map((key) => [key, true])) as Partial<
+    Record<SunnahPrayerKey, boolean>
+  >;
+}
+
+function getSunnahChecklistStorageKey(date = new Date()) {
+  return `${sunnahChecklistStorageKeyPrefix}:${formatDateKey(date)}`;
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 function getCombinedReminderItems(
@@ -1225,6 +1412,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  sunnahReminderItemChecked: {
+    backgroundColor: '#EEF8E8',
+    borderColor: colors.primary,
+  },
   reminderInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1313,6 +1504,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#FFFFFF',
   },
+  sunnahNotificationButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: '#C8D7BE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  sunnahNotificationButtonActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: colors.primary,
+  },
   reminderCheckButton: {
     width: 30,
     height: 30,
@@ -1326,6 +1531,20 @@ const styles = StyleSheet.create({
   reminderCheckButtonChecked: {
     backgroundColor: '#00813A',
     borderColor: '#00813A',
+  },
+  sunnahCheckButton: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.full,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#C8D7BE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sunnahCheckButtonChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   skeletonOnGreen: {
     backgroundColor: 'rgba(255,255,255,0.26)',

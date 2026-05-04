@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Ionicons,
   MaterialCommunityIcons,
@@ -5,6 +6,7 @@ import {
 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { toHijri } from 'hijri-date/lib/safe.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -33,6 +35,10 @@ import {
   getAppPreferences,
   type AppPreferences,
 } from '@/services/PreferenceService';
+import {
+  sunnahPrayerDefinitions,
+  type SunnahPrayerKey,
+} from '@/services/SunnahReminderService';
 import { SkeletonBox } from '@/shared/components/feedback/SkeletonBox';
 import { type IndonesiaCity } from '@/shared/constants/indonesia-cities';
 import {
@@ -46,6 +52,18 @@ import { getCalendarDateParts } from '@/shared/utils/time';
 import { colors, radius, shadows, spacing, typography } from '@/theme';
 
 const STREAK_DOT_COUNT = 8;
+const sunnahReminderStorageKey = 'sunnah:reminders';
+
+type SunnahPrayerItem = {
+  key: `sunnah-${SunnahPrayerKey}`;
+  sunnahKey: SunnahPrayerKey;
+  name: string;
+  time: string;
+  time24h: string;
+  reminderType: 'sunnah';
+};
+
+type ReminderListItem = PrayerScheduleItem | SunnahPrayerItem;
 
 const prayerVisuals: Record<
   PrayerScheduleItem['key'],
@@ -136,6 +154,26 @@ function PrayerReminderRow({
   );
 }
 
+function SunnahReminderRow({ prayer }: { prayer: SunnahPrayerItem }) {
+  return (
+    <View style={styles.sunnahReminderItem}>
+      <View style={styles.reminderInfo}>
+        <View style={styles.sunnahReminderIconWrap}>
+          <MaterialCommunityIcons name="star-crescent" size={26} color={colors.primary} />
+        </View>
+
+        <View style={styles.reminderCopy}>
+          <View style={styles.sunnahNameRow}>
+            <Text style={styles.sunnahPrayerName}>{prayer.name}</Text>
+            <Text style={styles.sunnahBadge}>Sunnah</Text>
+          </View>
+          <Text style={styles.sunnahPrayerTime}>{prayer.time}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { gregorianDate, hijriDate } = getCalendarDateParts();
@@ -154,6 +192,7 @@ export default function HomeScreen() {
   const [isLocationPickerVisible, setIsLocationPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
   const [preferences, setPreferences] = useState<AppPreferences>(defaultAppPreferences);
+  const [enabledSunnahKeys, setEnabledSunnahKeys] = useState<SunnahPrayerKey[]>([]);
   const [schedule, setSchedule] = useState(() =>
     getPrayerSchedule(
       {
@@ -185,9 +224,10 @@ export default function HomeScreen() {
 
     async function loadInitialState() {
       try {
-        const [initialLocation, storedPreferences] = await Promise.all([
+        const [initialLocation, storedPreferences, storedSunnahKeys] = await Promise.all([
           getInitialLocationState(),
           getAppPreferences(),
+          getStoredEnabledSunnahKeys(),
         ]);
 
         if (!isMounted) {
@@ -196,6 +236,7 @@ export default function HomeScreen() {
 
         setSelectedCity(initialLocation.city);
         setPreferences(storedPreferences);
+        setEnabledSunnahKeys(storedSunnahKeys);
         setSchedule(
           getPrayerSchedule(
             {
@@ -216,6 +257,7 @@ export default function HomeScreen() {
 
         setSelectedCity(defaultIndonesiaCity);
         setPreferences(defaultAppPreferences);
+        setEnabledSunnahKeys([]);
         setSchedule(
           getPrayerSchedule(
             {
@@ -249,9 +291,10 @@ export default function HomeScreen() {
 
       async function syncOnFocus() {
         try {
-          const [nextLocation, nextPreferences] = await Promise.all([
+          const [nextLocation, nextPreferences, nextSunnahKeys] = await Promise.all([
             getInitialLocationState(),
             getAppPreferences(),
+            getStoredEnabledSunnahKeys(),
           ]);
 
           if (!isActive) {
@@ -260,6 +303,7 @@ export default function HomeScreen() {
 
           setSelectedCity(nextLocation.city);
           setPreferences(nextPreferences);
+          setEnabledSunnahKeys(nextSunnahKeys);
           setSchedule(
             getPrayerSchedule(
               {
@@ -452,6 +496,10 @@ export default function HomeScreen() {
     () => formatLocationLabel(selectedCity),
     [selectedCity]
   );
+  const reminderItems = useMemo(
+    () => getCombinedReminderItems(schedule.prayers, enabledSunnahKeys, preferences.clockFormat),
+    [enabledSunnahKeys, preferences.clockFormat, schedule]
+  );
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
@@ -571,23 +619,29 @@ export default function HomeScreen() {
             <ReminderListSkeleton />
           ) : (
             <View style={styles.reminderList}>
-              {schedule.prayers.map((item) => (
-                <PrayerReminderRow
-                  key={item.key}
-                  prayer={item}
-                  isChecked={Boolean(prayerChecklist[item.name])}
-                  isNotificationEnabled={
-                    notificationSettings.isEnabled &&
-                    notificationSettings.enabledPrayers[
-                    prayerVisuals[item.key].notificationKey
-                    ]
-                  }
-                  onToggle={() => void handleTogglePrayer(item.name)}
-                  onToggleNotification={() =>
-                    void handleTogglePrayerNotification(item.key)
-                  }
-                />
-              ))}
+              {reminderItems.map((item) => {
+                if (isSunnahReminderItem(item)) {
+                  return <SunnahReminderRow key={item.key} prayer={item} />;
+                }
+
+                return (
+                  <PrayerReminderRow
+                    key={item.key}
+                    prayer={item}
+                    isChecked={Boolean(prayerChecklist[item.name])}
+                    isNotificationEnabled={
+                      notificationSettings.isEnabled &&
+                      notificationSettings.enabledPrayers[
+                      prayerVisuals[item.key].notificationKey
+                      ]
+                    }
+                    onToggle={() => void handleTogglePrayer(item.name)}
+                    onToggleNotification={() =>
+                      void handleTogglePrayerNotification(item.key)
+                    }
+                  />
+                );
+              })}
             </View>
           )}
         </View>
@@ -651,6 +705,171 @@ function formatLocationLabel(city: IndonesiaCity) {
     .trim();
 
   return `${sanitized}, Idn`;
+}
+
+async function getStoredEnabledSunnahKeys(): Promise<SunnahPrayerKey[]> {
+  const rawValue = await AsyncStorage.getItem(sunnahReminderStorageKey);
+
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as unknown;
+
+    if (Array.isArray(parsed)) {
+      return parsed.filter(isSunnahPrayerKey);
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed)
+        .filter((entry): entry is [SunnahPrayerKey, boolean] => (
+          isSunnahPrayerKey(entry[0]) && entry[1] === true
+        ))
+        .map(([key]) => key);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function getCombinedReminderItems(
+  prayers: PrayerScheduleItem[],
+  enabledSunnahKeys: SunnahPrayerKey[],
+  clockFormat: AppPreferences['clockFormat']
+): ReminderListItem[] {
+  const sunnahItems = getEnabledSunnahSchedule(enabledSunnahKeys, prayers, clockFormat);
+
+  return [...prayers, ...sunnahItems].sort((first, second) =>
+    compareTime(first.time24h, second.time24h)
+  );
+}
+
+function getEnabledSunnahSchedule(
+  enabledSunnahKeys: SunnahPrayerKey[],
+  prayers: PrayerScheduleItem[],
+  clockFormat: AppPreferences['clockFormat']
+): SunnahPrayerItem[] {
+  const enabledSet = new Set(enabledSunnahKeys);
+  const today = new Date();
+  const fajr = findPrayerDate(prayers, 'fajr', today);
+  const dhuhr = findPrayerDate(prayers, 'dhuhr', today);
+  const asr = findPrayerDate(prayers, 'asr', today);
+  const maghrib = findPrayerDate(prayers, 'maghrib', today);
+  const isha = findPrayerDate(prayers, 'isha', today);
+  const isRamadhan = isRamadhanToday();
+  const dates: Partial<Record<SunnahPrayerKey, Date | null>> = {
+    tahajud: setTime(today, 2, 30),
+    'subuh-qobliyah': fajr ? addMinutes(fajr, -15) : null,
+    dhuha: fajr ? addMinutes(fajr, 90) : null,
+    'dzuhur-qobliyah': dhuhr ? addMinutes(dhuhr, -30) : null,
+    'dzuhur-badiyah': dhuhr ? addMinutes(dhuhr, 15) : null,
+    'ashar-qobliyah': asr ? addMinutes(asr, -30) : null,
+    'maghrib-badiyah': maghrib ? addMinutes(maghrib, 15) : null,
+    'isya-badiyah': isha ? addMinutes(isha, 15) : null,
+    tarawih: isRamadhan && maghrib ? addMinutes(maghrib, 60) : null,
+    witir: setTime(today, 3, 0),
+  };
+
+  return sunnahPrayerDefinitions.flatMap((definition) => {
+    if (!enabledSet.has(definition.key) || (definition.key === 'tarawih' && !isRamadhan)) {
+      return [];
+    }
+
+    const date = dates[definition.key];
+
+    if (!date) {
+      return [];
+    }
+
+    return [
+      {
+        key: `sunnah-${definition.key}`,
+        sunnahKey: definition.key,
+        name: definition.name,
+        time: formatReminderTime(date, clockFormat),
+        time24h: formatReminderTime(date, '24h'),
+        reminderType: 'sunnah' as const,
+      },
+    ];
+  });
+}
+
+function isSunnahReminderItem(item: ReminderListItem): item is SunnahPrayerItem {
+  return 'reminderType' in item && item.reminderType === 'sunnah';
+}
+
+function isSunnahPrayerKey(value: unknown): value is SunnahPrayerKey {
+  return sunnahPrayerDefinitions.some((item) => item.key === value);
+}
+
+function isRamadhanToday() {
+  try {
+    return toHijri(new Date()).getMonth() === 9;
+  } catch {
+    return false;
+  }
+}
+
+function findPrayerDate(
+  prayers: PrayerScheduleItem[],
+  key: PrayerScheduleItem['key'],
+  date: Date
+) {
+  const prayer = prayers.find((item) => item.key === key);
+
+  return prayer ? createPrayerDate(prayer.time24h, date) : null;
+}
+
+function createPrayerDate(time: string, baseDate: Date) {
+  const [hourRaw, minuteRaw] = time.split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  const date = new Date(baseDate);
+
+  date.setHours(Number.isFinite(hour) ? hour : 0, Number.isFinite(minute) ? minute : 0, 0, 0);
+
+  return date;
+}
+
+function setTime(date: Date, hour: number, minute: number) {
+  const nextDate = new Date(date);
+
+  nextDate.setHours(hour, minute, 0, 0);
+
+  return nextDate;
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
+function compareTime(firstTime: string, secondTime: string) {
+  return parseTimeMinutes(firstTime) - parseTimeMinutes(secondTime);
+}
+
+function parseTimeMinutes(time: string) {
+  const [hourRaw, minuteRaw] = time.split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+
+  return (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
+}
+
+function formatReminderTime(date: Date, clockFormat: AppPreferences['clockFormat']) {
+  const hour = date.getHours();
+  const minute = String(date.getMinutes()).padStart(2, '0');
+
+  if (clockFormat === '12h') {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const normalizedHour = hour % 12 || 12;
+
+    return `${String(normalizedHour).padStart(2, '0')}:${minute} ${period}`;
+  }
+
+  return `${String(hour).padStart(2, '0')}:${minute}`;
 }
 
 function getMillisecondsUntilNextMidnight() {
@@ -993,6 +1212,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#00813A',
   },
+  sunnahReminderItem: {
+    minHeight: 76,
+    backgroundColor: '#F5FAEF',
+    borderColor: '#B8D8A8',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   reminderInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1007,8 +1239,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sunnahReminderIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: '#E7F0DE',
+    borderWidth: 1,
+    borderColor: '#B8D8A8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   reminderCopy: {
     flex: 1,
+  },
+  sunnahNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   reminderPrayerName: {
     color: '#FFFFFF',
@@ -1016,11 +1263,34 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontWeight: typography.fontWeightBold,
   },
+  sunnahPrayerName: {
+    color: '#1D2A21',
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: typography.fontWeightBold,
+  },
+  sunnahBadge: {
+    color: colors.primary,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: typography.fontWeightBold,
+    backgroundColor: '#E7F0DE',
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
   reminderPrayerTime: {
     color: '#FFFFFF',
     fontSize: 16,
     lineHeight: 22,
     fontWeight: typography.fontWeightRegular,
+    marginTop: 2,
+  },
+  sunnahPrayerTime: {
+    color: '#69736B',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: typography.fontWeightMedium,
     marginTop: 2,
   },
   reminderActions: {

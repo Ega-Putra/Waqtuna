@@ -21,10 +21,11 @@ import { getPrayerSchedule, type PrayerSchedule } from '@/shared/utils/prayer';
 import { colors, spacing, typography } from '@/theme';
 
 const sunnahReminderStorageKey = 'sunnah:reminders';
+type SunnahReminderMap = Partial<Record<SunnahPrayerKey, boolean>>;
 
 export default function SunnahPrayersScreen() {
   const router = useRouter();
-  const [enabledKeys, setEnabledKeys] = useState<SunnahPrayerKey[]>([]);
+  const [enabledReminders, setEnabledReminders] = useState<SunnahReminderMap>({});
   const [schedule, setSchedule] = useState<PrayerSchedule>(() =>
     getPrayerSchedule({
       latitude: defaultIndonesiaCity.latitude,
@@ -32,7 +33,6 @@ export default function SunnahPrayersScreen() {
     })
   );
   const [locationName, setLocationName] = useState(() => getLocationLabel(defaultIndonesiaCity));
-  const [isSaving, setIsSaving] = useState(false);
   const isRamadhan = useMemo(() => isRamadhanToday(), []);
   const visiblePrayers = useMemo(
     () => sunnahPrayerDefinitions.filter((item) => item.key !== 'tarawih' || isRamadhan),
@@ -55,12 +55,13 @@ export default function SunnahPrayersScreen() {
         longitude: city.longitude,
       });
       const activeKeys = storedKeys.filter((key) => key !== 'tarawih' || isRamadhan);
+      const activeReminderMap = createReminderMap(activeKeys);
 
       if (!isMounted) {
         return;
       }
 
-      setEnabledKeys(activeKeys);
+      setEnabledReminders(activeReminderMap);
       setSchedule(nextSchedule);
       setLocationName(getLocationLabel(city));
       void SunnahReminderService.scheduleAll(activeKeys, nextSchedule);
@@ -73,31 +74,28 @@ export default function SunnahPrayersScreen() {
     };
   }, [isRamadhan]);
 
-  const persistReminderKeys = useCallback(
-    async (nextKeys: SunnahPrayerKey[]) => {
-      setIsSaving(true);
-      setEnabledKeys(nextKeys);
-
+  const persistAndSchedule = useCallback(
+    async (nextReminders: SunnahReminderMap) => {
       try {
-        await AsyncStorage.setItem(sunnahReminderStorageKey, JSON.stringify(nextKeys));
-        await SunnahReminderService.scheduleAll(nextKeys, schedule);
-      } finally {
-        setIsSaving(false);
+        const enabledKeys = getEnabledReminderKeys(nextReminders);
+
+        await AsyncStorage.setItem(sunnahReminderStorageKey, JSON.stringify(nextReminders));
+        await SunnahReminderService.scheduleAll(enabledKeys, schedule);
+      } catch (error) {
+        console.warn('Failed to persist sunnah prayer reminders', error);
       }
     },
     [schedule]
   );
 
   function handleToggleReminder(key: SunnahPrayerKey) {
-    if (isSaving) {
-      return;
-    }
+    const nextReminders = {
+      ...enabledReminders,
+      [key]: !enabledReminders[key],
+    };
 
-    const nextKeys = enabledKeys.includes(key)
-      ? enabledKeys.filter((item) => item !== key)
-      : [...enabledKeys, key];
-
-    void persistReminderKeys(nextKeys);
+    setEnabledReminders(nextReminders);
+    void persistAndSchedule(nextReminders);
   }
 
   return (
@@ -123,7 +121,7 @@ export default function SunnahPrayersScreen() {
 
         <View style={styles.list}>
           {visiblePrayers.map((item) => {
-            const isEnabled = enabledKeys.includes(item.key);
+            const isEnabled = Boolean(enabledReminders[item.key]);
             const reminderDate = SunnahReminderService.getReminderDate(item.key, schedule);
 
             return (
@@ -145,7 +143,6 @@ export default function SunnahPrayersScreen() {
 
                 <Switch
                   value={isEnabled}
-                  disabled={isSaving}
                   onValueChange={() => handleToggleReminder(item.key)}
                   trackColor={{ false: '#C8D7BE', true: '#72C27D' }}
                   thumbColor={isEnabled ? colors.primary : '#FFFFFF'}
@@ -169,14 +166,34 @@ async function getStoredReminderKeys(): Promise<SunnahPrayerKey[]> {
   try {
     const parsed = JSON.parse(rawValue) as unknown;
 
-    if (!Array.isArray(parsed)) {
-      return [];
+    if (Array.isArray(parsed)) {
+      return parsed.filter(isSunnahPrayerKey);
     }
 
-    return parsed.filter(isSunnahPrayerKey);
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed)
+        .filter((entry): entry is [SunnahPrayerKey, boolean] => (
+          isSunnahPrayerKey(entry[0]) && entry[1] === true
+        ))
+        .map(([key]) => key);
+    }
+
+    return [];
   } catch {
     return [];
   }
+}
+
+function createReminderMap(keys: SunnahPrayerKey[]): SunnahReminderMap {
+  return Object.fromEntries(keys.map((key) => [key, true])) as SunnahReminderMap;
+}
+
+function getEnabledReminderKeys(reminders: SunnahReminderMap) {
+  return Object.entries(reminders)
+    .filter((entry): entry is [SunnahPrayerKey, boolean] => (
+      isSunnahPrayerKey(entry[0]) && entry[1] === true
+    ))
+    .map(([key]) => key);
 }
 
 function isSunnahPrayerKey(value: unknown): value is SunnahPrayerKey {

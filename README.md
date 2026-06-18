@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/logo.png" width="120" alt="Waqtuna Logo">
+  <img src="assets/images/app-favicon.png" width="120" alt="Waqtuna Logo">
 </p>
 
 # Waqtuna

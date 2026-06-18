@@ -107,4 +107,4 @@ If this tool has helped you in your daily prayers or kept you connected to Islam
 
 ---
 
-*Made with care by [Ega Putra](https://github.com/ega-putra)*
+*Made with care by [Ega Putra](https://github.com/ega-putra) & [Radhit Pribadi](https://github.com/radhitchocs)*
